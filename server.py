@@ -11,10 +11,12 @@ def alpaca():
 	secret_key = request.args.get('secret_key')
 
 	if key_id is not None and secret_key is not None:
+		headers = Headers()
 
 		url = 'https://api.alpaca.markets/v2/orders'
 
-	    headers = {'APCA_API_SECRET_KEY': key_id; 'APCA_API_SECRET_KEY': secret_key}
+	    headers.add('APCA_API_SECRET_KEY', key_id)
+	    headers.add('APCA_API_SECRET_KEY', secret_key)
 
 	    response = requests.post(url, data=data, headers=headers)
 
