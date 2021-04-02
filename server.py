@@ -6,9 +6,9 @@ app = Flask(__name__)
 @app.route('/', methods=["POST"])
 
 def alpaca():
-    key_id = request.args.get('key_id')
+    key_id = requests.args.get('key_id')
 
-    secret_key = request.args.get('secret_key')
+    secret_key = requests.args.get('secret_key')
 
     if key_id is not None and secret_key is not None:
         headers = Headers()
