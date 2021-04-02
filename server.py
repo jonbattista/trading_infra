@@ -15,7 +15,7 @@ def alpaca():
 
         url = 'https://api.alpaca.markets/v2/orders'
 
-        headers.add('APCA_API_SECRET_KEY', key_id)
+        headers.add('APCA_API_KEY_ID', key_id)
         headers.add('APCA_API_SECRET_KEY', secret_key)
 
         response = requests.post(url, data=data, headers=headers)
