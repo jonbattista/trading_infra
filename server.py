@@ -26,8 +26,8 @@ def alpaca():
         return 'ticker is not set!', 400
     if json_data['price'] is None:
         return 'price is not set!', 400
-    if json_data['type'] is None:
-        return 'type is not set!', 400
+    if json_data['order'] is None:
+        return 'order is not set!', 400
 
     time_in_force_condition = 'time_in_force' not in json_data
     print(time_in_force_condition)
@@ -35,7 +35,7 @@ def alpaca():
         time_in_force = 'day'
     else:
         time_in_force = json_data['time_in_force']
-        
+
     order_type_condition = 'order_type' not in json_data
     print(order_type_condition)
     if order_type_condition:
