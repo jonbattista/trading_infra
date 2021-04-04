@@ -1,6 +1,7 @@
 from flask import Flask, request
 import requests
 import alpaca_trade_api as tradeapi
+import json
 
 app = Flask(__name__)
 
@@ -9,7 +10,7 @@ app.debug = True
 @app.route('/', methods=["POST"])
 
 def alpaca():
-    data = request.data
+    data = json.loads(request.data)
 
     print(data)
     print(request.args)
