@@ -86,13 +86,17 @@ def alpaca():
     print(buying_power)
     
     if buying_power != 0:
-        number_of_shares = buying_power // price
-        print(f'You can purchasre {number_of_shares} at {price} from buying power of {buying_power}')
+        number_of_shares = round(buying_power // price)
         if number_of_shares > 0:
-            print(number_of_shares)
-            print(round(number_of_shares))
+            print(f'You can purchasre round({number_of_shares}) at {price} from buying power of {buying_power}')
 
-            order = api.submit_order(ticker, number_of_shares, order, order_type, time_in_force)
+            order = api.submit_order(symbol=ticker,
+                qty=number_of_shares, 
+                side=order, 
+                type=order_type, 
+                time_in_force=time_in_force,
+                limit_price=price
+            )
 
     #print(order)
     #return f'Order was {order.status}'
