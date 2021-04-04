@@ -61,9 +61,14 @@ def alpaca():
 
     if account.trading_blocked:
         return 'Account is currently restricted from trading.', 400
-
+    open_orders = api.list_orders()
+    print(open_orders)
     portfolio = api.list_positions()
     print(portfolio)
+    if not portfolio:
+        print('No Open positions found!')
+    else:
+
     sqqq_position = api.get_position('SQQQ')
 
     print(sqqq_position)
