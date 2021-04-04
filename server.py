@@ -10,7 +10,7 @@ app.debug = True
 @app.route('/', methods=["POST"])
 
 def alpaca():
-    data = request.data
+    data = json.loads(request.data)
 
     print(data)
     print(request.args)
