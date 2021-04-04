@@ -8,8 +8,8 @@ COPY src/requirements.txt ./
 
 RUN pip install -r requirements.txt
 
-# Bundle app source
-COPY src /app
+# Copy app source
+COPY src/server.py /app
 
 EXPOSE 8080
-CMD [ "python", "server.py" ]
+CMD [ "python3", "server.py" ]

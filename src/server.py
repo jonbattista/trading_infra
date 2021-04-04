@@ -67,7 +67,8 @@ def alpaca():
     print(portfolio)
     if not portfolio:
         print('No Open positions found!')
-
+    else:
+        if 
     sqqq_position = api.get_position('SQQQ')
 
     print(sqqq_position)
