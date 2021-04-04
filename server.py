@@ -26,9 +26,13 @@ def alpaca():
         return 'price is not set!', 400
     if data['type'] is None:
         return 'type is not set!', 400
-    time_in_force = data['time_in_force'] if data['time_in_force'] is not None else 'limit'
 
-    order_type = data['order_type'] if data['order_type'] is not None else 'limit'
+    time_in_force_condition = data['time_in_force'] is not None
+    print(time_in_force_condition)
+    time_in_force = data['time_in_force'] if time_in_force_condition else 'day'
+    order_type_condition = data['order_type'] is not None
+    print(order_type_condition)
+    order_type = data['order_type'] if order_type_condition else 'limit'
 
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
@@ -49,6 +53,14 @@ def alpaca():
     if account.trading_blocked:
         return 'Account is currently restricted from trading.', 400
 
+    sqqq_position = api.get_position('SQQQ')
+
+    print(sqqq_position)
+
+    tqqq_position = api.get_position('TQQQ')
+
+    print(tqqq_position)
+    
     buying_power = account.buying_power
     
     print(buying_power)
