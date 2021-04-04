@@ -21,27 +21,6 @@ def alpaca():
     if request.args.get('APCA_API_SECRET_KEY') is None:
         return 'APCA_API_SECRET_KEY is not set!', 400
 
-    if request.args.get('SYMBOL') is None:
-        return 'SYMBOL is not set!', 400
-
-    if request.args.get('QUANTITY') is None:
-        return 'QUANTITY is not set!', 400
-
-    if request.args.get('TYPE') is None:
-        return 'TYPE is not set!', 400
-
-    if request.args.get('ORDER_TYPE') is None:
-        return 'ORDER_TYPE is not set!', 400
-
-    if request.args.get('TIME_IN_FORCE') is None:
-        return 'TIME_IN_FORCE is not set!', 400
-
-    if request.args.get('LIMIT_PRICE') is None:
-        return 'LIMIT_PRICE is not set!', 400
-
-    if request.args.get('CLIENT_ORDER_ID') is None:
-        return 'CLIENT_ORDER_ID is not set!', 400
-
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
     SYMBOL = request.args.get('SYMBOL')
