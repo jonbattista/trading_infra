@@ -74,16 +74,16 @@ def alpaca():
             sqqq_position = api.get_position('SQQQ')
         except requests.HTTPError as exception:
             print(exception)
+        
+            #print(sqqq_position)
+
+    #tqqq_position = api.get_position('TQQQ')
+
+    #print(tqqq_position)
+
+    #buying_power = account.buying_power
     
-    print(sqqq_position)
-
-    tqqq_position = api.get_position('TQQQ')
-
-    print(tqqq_position)
-
-    buying_power = account.buying_power
-    
-    print(buying_power)
+    #print(buying_power)
     
     if buying_power != 0:
         number_of_shares = price // buying_power
