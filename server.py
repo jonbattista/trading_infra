@@ -14,7 +14,8 @@ def alpaca():
     data = request.data
 
     print(data)
-    print(json.loads(data))
+    json_data = json.loads(data)
+    print(json_data)
     print(request.args)
 
     if request.args.get('APCA_API_KEY_ID') is None:
