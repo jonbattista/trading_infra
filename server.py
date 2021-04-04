@@ -38,7 +38,10 @@ def alpaca():
         
     order_type_condition = 'order_type' not in json_data
     print(order_type_condition)
-    order_type = json_data['order_type'] if order_type_condition else 'limit'
+    if order_type_condition:
+        order_type = 'day'
+    else:
+        order_type = json_data['order_type']
 
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
