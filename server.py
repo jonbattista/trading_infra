@@ -26,9 +26,9 @@ def alpaca():
         return 'price is not set!', 400
     if data['type'] is None:
         return 'type is not set!', 400
-    time_in_force = data['time_in_force'] if data['time_in_force'] is not None else time_in_force = 'limit'
+    time_in_force = data['time_in_force'] if data['time_in_force'] is not None else 'limit'
 
-    order_type = data['order_type'] if data['order_type'] is not None else order_type = 'limit'
+    order_type = data['order_type'] if data['order_type'] is not None else 'limit'
 
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
