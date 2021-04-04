@@ -39,7 +39,7 @@ def alpaca():
     order_type_condition = 'order_type' not in json_data
     print(order_type_condition)
     if order_type_condition:
-        order_type = 'day'
+        order_type = 'limit'
     else:
         order_type = json_data['order_type']
 
@@ -62,6 +62,8 @@ def alpaca():
     if account.trading_blocked:
         return 'Account is currently restricted from trading.', 400
 
+    portfolio = api.list_positions()
+    print(portfolio)
     sqqq_position = api.get_position('SQQQ')
 
     print(sqqq_position)
