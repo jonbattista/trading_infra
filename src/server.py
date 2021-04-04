@@ -77,6 +77,7 @@ def alpaca():
     
     try:   
         tqqq_position = api.get_position('TQQQ')
+        tqqq_position.raise_for_status()
         print(tqqq_position)
     except requests.HTTPError as exception:
         print(exception)  
