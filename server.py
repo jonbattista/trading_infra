@@ -11,7 +11,7 @@ app.debug = True
 
 
 def alpaca():
-    data = request.data
+    data = json.loads(request.data)
 
     print(data)
     print(request.args)
