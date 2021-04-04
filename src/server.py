@@ -86,8 +86,8 @@ def alpaca():
     print(buying_power)
     
     if buying_power != 0:
-        number_of_shares = price // buying_power
-        print(number_of_shares)
+        number_of_shares = buying_power // price
+        print(f'You can purchasre {number_of_shares} at {price} from buying power of {buying_power}')
         if number_of_shares > 0:
             print(number_of_shares)
             print(round(number_of_shares))
