@@ -9,10 +9,10 @@ app.debug = True
 @app.route('/', methods=["POST"])
 
 def alpaca():
+    data = request.data
 
+    print(data)
 
-
-# Submit a market order to buy 1 share of Apple at market price
     if request.args.get('APCA_API_KEY_ID') is None:
         return 'APCA_API_KEY_ID is not set!', 400
 
@@ -34,13 +34,22 @@ def alpaca():
     if request.args.get('TIME_IN_FORCE') is None:
         return 'TIME_IN_FORCE is not set!', 400
 
+    if request.args.get('LIMIT_PRICE') is None:
+        return 'LIMIT_PRICE is not set!', 400
+
+    if request.args.get('CLIENT_ORDER_ID') is None:
+        return 'CLIENT_ORDER_ID is not set!', 400
+
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
     SYMBOL = request.args.get('SYMBOL')
     QUANTITY = request.args.get('QUANTITY') 
     TYPE = request.args.get('TYPE') 
     ORDER_TYPE = request.args.get('ORDER_TYPE')
-    TIME_IN_FORCE = request.args.get('TIME_IN_FORCE') 
+    TIME_IN_FORCE = request.args.get('TIME_IN_FORCE')
+    LIMIT_PRICE = request.args.get('LIMIT_PRICE')
+    CLIENT_ORDER_ID = request.args.get('CLIENT_ORDER_ID')
+
 
     print(APCA_API_KEY_ID)
     print(APCA_API_SECRET_KEY)
