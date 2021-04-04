@@ -11,9 +11,10 @@ app.debug = True
 
 
 def alpaca():
-    data = json.loads(request.data)
+    data = request.data
 
     print(data)
+    print(json.loads(data))
     print(request.args)
 
     if request.args.get('APCA_API_KEY_ID') is None:
@@ -60,7 +61,7 @@ def alpaca():
     tqqq_position = api.get_position('TQQQ')
 
     print(tqqq_position)
-    
+
     buying_power = account.buying_power
     
     print(buying_power)
