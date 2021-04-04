@@ -31,8 +31,11 @@ def alpaca():
 
     time_in_force_condition = 'time_in_force' not in json_data
     print(time_in_force_condition)
-    time_in_force = json_data['time_in_force'] if time_in_force_condition else 'day'
-
+    if time_in_force_condition:
+        time_in_force = 'day'
+    else:
+        time_in_force = json_data['time_in_force']
+        
     order_type_condition = 'order_type' not in json_data
     print(order_type_condition)
     order_type = json_data['order_type'] if order_type_condition else 'limit'
