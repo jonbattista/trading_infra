@@ -10,9 +10,10 @@ app.debug = True
 @app.route('/', methods=["POST"])
 
 def alpaca():
-    data = json.loads(request.data)
+    data = request.data
 
     print(data)
+    print(json.loads(data))
     print(request.args)
 
     if request.args.get('APCA_API_KEY_ID') is None:
