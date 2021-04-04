@@ -77,7 +77,7 @@ def alpaca():
     
     try:   
         tqqq_position = api.get_position('TQQQ')
-    except alpaca_trade_api.rest.APIError as exception:
+    except tradeapi.rest.APIError as exception:
         print(exception)  
 
     buying_power = int(account.buying_power)
