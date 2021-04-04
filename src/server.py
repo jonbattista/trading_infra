@@ -81,9 +81,9 @@ def alpaca():
 
     #print(tqqq_position)
 
-    #buying_power = account.buying_power
+    buying_power = account.buying_power
     
-    #print(buying_power)
+    print(buying_power)
     
     if buying_power != 0:
         number_of_shares = price // buying_power
