@@ -29,10 +29,11 @@ def alpaca():
     if json_data['type'] is None:
         return 'type is not set!', 400
 
-    time_in_force_condition = json_data['time_in_force'] is not None
+    time_in_force_condition = json_data.has_key('time_in_force') is not None
     print(time_in_force_condition)
-    time_in_force = json_data['time_in_force'] if time_in_force_condition else 'day'
-    order_type_condition = json_data['order_type'] is not None
+    time_in_force = json_data.['time_in_force'] if time_in_force_condition else 'day'
+    
+    order_type_condition = json_data.has_key('order_type') is not None
     print(order_type_condition)
     order_type = json_data['order_type'] if order_type_condition else 'limit'
 
