@@ -81,7 +81,7 @@ def alpaca():
 
     #print(tqqq_position)
 
-    buying_power = account.buying_power
+    buying_power = int(account.buying_power)
     
     print(buying_power)
     
