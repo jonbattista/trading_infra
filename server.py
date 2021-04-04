@@ -22,25 +22,25 @@ def alpaca():
         return 'APCA_API_KEY_ID is not set!', 400
     if request.args.get('APCA_API_SECRET_KEY') is None:
         return 'APCA_API_SECRET_KEY is not set!', 400
-    if data['ticker'] is None:
+    if json_data['ticker'] is None:
         return 'ticker is not set!', 400
-    if data['price'] is None:
+    if json_data['price'] is None:
         return 'price is not set!', 400
-    if data['type'] is None:
+    if json_data['type'] is None:
         return 'type is not set!', 400
 
-    time_in_force_condition = data['time_in_force'] is not None
+    time_in_force_condition = json_data['time_in_force'] is not None
     print(time_in_force_condition)
-    time_in_force = data['time_in_force'] if time_in_force_condition else 'day'
-    order_type_condition = data['order_type'] is not None
+    time_in_force = json_data['time_in_force'] if time_in_force_condition else 'day'
+    order_type_condition = json_data['order_type'] is not None
     print(order_type_condition)
-    order_type = data['order_type'] if order_type_condition else 'limit'
+    order_type = json_data['order_type'] if order_type_condition else 'limit'
 
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
-    ticker = data['ticker']
-    price = data['price']
-    order = data['order']
+    ticker = json_data['ticker']
+    price = json_data['price']
+    order = json_data['order']
 
     print(f'ticker is {ticker}')
     print(f'price is {price}')
