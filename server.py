@@ -12,6 +12,7 @@ def alpaca():
     data = request.data
 
     print(data)
+    print(request.args)
 
     if request.args.get('APCA_API_KEY_ID') is None:
         return 'APCA_API_KEY_ID is not set!', 400
