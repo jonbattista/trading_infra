@@ -23,22 +23,10 @@ def alpaca():
 
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
-    SYMBOL = request.args.get('SYMBOL')
-    QUANTITY = request.args.get('QUANTITY') 
-    TYPE = request.args.get('TYPE') 
-    ORDER_TYPE = request.args.get('ORDER_TYPE')
-    TIME_IN_FORCE = request.args.get('TIME_IN_FORCE')
-    LIMIT_PRICE = request.args.get('LIMIT_PRICE')
-    CLIENT_ORDER_ID = request.args.get('CLIENT_ORDER_ID')
 
 
     print(APCA_API_KEY_ID)
     print(APCA_API_SECRET_KEY)
-    print(SYMBOL)
-    print(QUANTITY)
-    print(TYPE)
-    print(ORDER_TYPE)
-    print(TIME_IN_FORCE)
 
     api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
 
