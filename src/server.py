@@ -74,22 +74,20 @@ def alpaca():
             sqqq_position = api.get_position('SQQQ')
         except requests.HTTPError as exception:
             print(exception)
-        
-            #print(sqqq_position)
-
-    #tqqq_position = api.get_position('TQQQ')
-
-    #print(tqqq_position)
+    
+    try:   
+        tqqq_position = api.get_position('TQQQ')
+        print(tqqq_position)
+    except requests.HTTPError as exception:
+        print(exception)  
 
     buying_power = int(account.buying_power)
     
-    print(buying_power)
+    print(f'Buying Power is {buying_power}')
     
     if buying_power != 0:
         number_of_shares = round(buying_power // price)
         if number_of_shares > 0:
-            print(f'You can purchase {number_of_shares} at {price} from Buying Power of ${buying_power}')
-
             order = api.submit_order(symbol=ticker,
                 qty=number_of_shares, 
                 side=order, 
@@ -98,7 +96,10 @@ def alpaca():
                 limit_price=price
             )
             print(order)
-            return f'Purchase of {number_of_shares} at {price} was {order.status}'
+            if order.status == 'accepted':
+                return f'Success: Purchase of {number_of_shares} at ${price} was {order.status}'
+            else:
+                return f'Error: Purchase of {number_of_shares} at ${price} was {order.status}'
         else:
             return f'Not enough Buying Power: ${buying_power}', 200
     
