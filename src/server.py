@@ -119,7 +119,7 @@ def alpaca():
                 print(exception)
 
             if order.status == 'accepted':
-                result = f'Success: Sale of {tqqq_position.filled_qty} of TQQQ was {order.status}'
+                result = f'Success: Sale of {tqqq_position['filled_qty']} of TQQQ was {order.status}'
 
                 message = Mail(
                     from_email='alerts@trading.battista.dev',
@@ -136,7 +136,7 @@ def alpaca():
 
                 return result
             else:
-                result = f'Error: Sale of {tqqq_position.filled_qty} of TQQQ was {order.status}'
+                result = f'Error: Sale of {tqqq_position['filled_qty']} of TQQQ was {order.status}'
                 message = Mail(
                     from_email='alerts@trading.battista.dev',
                     to_emails='jonbattista@gmail.com',
