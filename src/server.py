@@ -155,6 +155,7 @@ def alpaca():
                     return f'Not enough Buying Power: ${buying_power}', 200
             
             return f'You have no Buying Power: ${buying_power}', 200
+    return 'hello', 200
 
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=8080)
