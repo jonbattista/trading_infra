@@ -2,6 +2,7 @@ from flask import Flask, request
 import requests
 import alpaca_trade_api as tradeapi
 import json
+from decimal import Decimal
 
 app = Flask(__name__)
 
@@ -26,8 +27,8 @@ def alpaca():
         return 'ticker is not set!', 400
     if json_data['price'] is None:
         return 'price is not set!', 400
-    if json_data['order'] is None:
-        return 'order is not set!', 400
+    if json_data['side'] is None:
+        return 'side is not set!', 400
 
     time_in_force_condition = 'time_in_force' not in json_data
     print(time_in_force_condition)
@@ -36,7 +37,7 @@ def alpaca():
     else:
         time_in_force = json_data['time_in_force']
 
-    order_type_condition = 'order_type' not in json_data
+    order_type_condition = 'type' not in json_data
     print(order_type_condition)
     if order_type_condition:
         order_type = 'limit'
@@ -47,11 +48,11 @@ def alpaca():
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
     ticker = json_data['ticker']
     price = json_data['price']
-    order = json_data['order']
+    side = json_data['side']
 
     print(f'ticker is {ticker}')
     print(f'price is {price}')
-    print(f'order is {order}')
+    print(f'side is {side}')
     print(f'time_in_force is {time_in_force}')
     print(f'order_type is {order_type}')
 
@@ -67,42 +68,93 @@ def alpaca():
     portfolio = api.list_positions()
     print(portfolio)
 
-    if not portfolio:
-        print('No Open positions found!')
-    else:
-        try:   
-            sqqq_position = api.get_position('SQQQ')
-        except requests.HTTPError as exception:
-            print(exception)
-    
-    try:   
-        tqqq_position = api.get_position('TQQQ')
-    except tradeapi.rest.APIError as exception:
-        print(exception)  
-
-    buying_power = int(account.buying_power)
-    
-    print(f'Buying Power is {buying_power}')
-    
-    if buying_power != 0:
-        number_of_shares = round(buying_power // price)
-        if number_of_shares > 0:
-            order = api.submit_order(symbol=ticker,
-                qty=number_of_shares, 
-                side=order, 
-                type=order_type, 
-                time_in_force=time_in_force,
-                limit_price=price
-            )
-            print(order)
-            if order.status == 'accepted':
-                return f'Success: Purchase of {number_of_shares} at ${price} was {order.status}'
-            else:
-                return f'Error: Purchase of {number_of_shares} at ${price} was {order.status}'
+    # Buying TQQQ alert
+    if side == 'buy':
+        if not portfolio:
+            print('No Open positions found!')
         else:
-            return f'Not enough Buying Power: ${buying_power}', 200
-    
-    return f'You have no Buying Power: ${buying_power}', 200
+            # Check if there is an open SQQQ position
+            try:   
+                sqqq_position = api.get_position('SQQQ')
+            except tradeapi.rest.APIError as exception:
+                print(exception)
+            
+            # Sell SQQQ positions at Market
+            order = api.submit_order(
+                symbol='SQQQ',
+                qty=sqqq_position.qty,
+                side='sell',
+                type='market',
+                time_in_force=time_in_force,
+            )
+            
+    # Selling TQQQ alert
+    elif side == 'sell':
+        if not portfolio:
+            print('No Open positions found!')
+        else:
+            # Check if there is an open TQQQ position
+            try:
+                tqqq_position = api.get_position('TQQQ')
+            except tradeapi.rest.APIError as exception:
+                print(exception)
+
+            # Sell TQQQ positions at Market price
+            order = api.submit_order(
+                symbol='TQQQ',
+                qty=tqqq_position.qty,
+                side='sell',
+                type='market',
+                time_in_force=time_in_force,
+            )
+
+            if order.status == 'accepted':
+                return f'Success: Sale of {tqqq_position.filled_qty} of TQQQ was {order.status}'
+            else:
+                return f'Error: Sale of {tqqq_position.filled_qty} of TQQQ was {order.status}'
+
+            # Wait for TQQQ Sell Order to be filled
+            tqqq_order_id = order.asset_id
+
+            tqqq_order_filled = False
+
+            while not tqqq_order_filled:
+                tqqq_order_status = get_order_by_client_order_id(tqqq_order_id)
+                if tqqq_order_status == 'filled':
+                    tqqq_order_filled = True
+
+            # Check if there is an TQQQ position is closed
+            try:
+                tqqq_position = api.get_position('TQQQ')
+            except tradeapi.rest.APIError as exception:
+                print(exception)
+
+            buying_power = Decimal(account.buying_power)
+            
+            print(f'Buying Power is {buying_power}')
+            
+            limit_price = Decimal(price) * Decimal('.0.5')
+
+            if buying_power != 0:
+                number_of_shares = round(buying_power // price)
+                if number_of_shares > 0:
+                    order = api.submit_order(
+                        symbol=ticker,
+                        qty=number_of_shares - 1,
+                        side=side,
+                        type=order_type,
+                        time_in_force=time_in_force,
+                        limit_price=limit_price
+                    )
+                    print(order)
+                    if order.status == 'accepted':
+                        return f'Success: Purchase of {number_of_shares} at ${price} was {order.status}'
+                    else:
+                        return f'Error: Purchase of {number_of_shares} at ${price} was {order.status}'
+                else:
+                    return f'Not enough Buying Power: ${buying_power}', 200
+            
+            return f'You have no Buying Power: ${buying_power}', 200
 
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=8080)
