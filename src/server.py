@@ -93,7 +93,6 @@ def alpaca():
 
     tqqq_position = json.loads('{"asset_id": "904837e3-3b76-47ec-b432-046db621571a","symbol": "TQQQ","exchange": "NASDAQ","asset_class": "us_equity","avg_entry_price": "100.0","qty": "5","side": "long","market_value": "600.0","cost_basis": "500.0","unrealized_pl": "100.0","unrealized_plpc": "0.20","unrealized_intraday_pl": "10.0","unrealized_intraday_plpc": "0.0084","current_price": "120.0","lastday_price": "119.0","change_today": "0.0084"}')
     print(portfolio)
-
     # Buying TQQQ alert
     if side == 'buy':
         if not portfolio:
@@ -108,7 +107,7 @@ def alpaca():
             # Sell SQQQ positions at Market
             order = api.submit_order(
                 symbol='SQQQ',
-                qty=sqqq_position.qty,
+                qty=sqqq_position['qty'],
                 side='sell',
                 type='market',
                 time_in_force=time_in_force,
@@ -128,7 +127,7 @@ def alpaca():
             # Sell TQQQ positions at Market price
             order = api.submit_order(
                 symbol='TQQQ',
-                qty=tqqq_position.qty,
+                qty=tqqq_position['qty'],
                 side='sell',
                 type='market',
                 time_in_force=time_in_force,
