@@ -52,7 +52,7 @@ def alpaca():
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
     ticker = json_data['ticker']
-    price = Decimal(json_data['price'])
+    price = json_data['price']
     side = json_data['side']
 
     print(f'ticker is {ticker}')
@@ -77,7 +77,8 @@ def alpaca():
             
     print(f'Buying Power is {buying_power}')
     print(type(price))
-    limit_price = price * Decimal('0.0.5')
+    print(price)
+    limit_price = Decimal(price) * Decimal('0.05')
 
     if buying_power > 0:
         number_of_shares = round(buying_power // limit_price)
