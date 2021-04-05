@@ -37,7 +37,7 @@ def alpaca():
     price = json_data['price']
     side = json_data['side']
     limit_price = float(price) * float('0.05')
-    
+
     api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
 
     account = api.get_account()
@@ -95,9 +95,9 @@ def alpaca():
             )
             print(order)
             if order.status == 'accepted':
-                return f'Success: Purchase of {qty} at ${limit_price} was {order.status}'
+                return f'Success: Order to purchase of {qty} at ${limit_price} was {order.status}'
             else:
-                return f'Error: Purchase of {qty} at ${limit_price} was {order.status}'
+                return f'Error: Order to purchase of {qty} at ${limit_price} was {order.status}'
         else:
             return f'Error: Not enough Buying Power (${buying_power}) to buy at limit price ${limit_price}', 200
     
