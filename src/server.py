@@ -73,7 +73,7 @@ def alpaca():
     else:
         print(f'{len(open_orders)} Open Orders were found!')
 
-    buying_power = Decimal(account.buying_power)
+    buying_power = float(account.buying_power)
             
     print(f'Buying Power is {buying_power}')
     print(type(price))
