@@ -110,14 +110,14 @@ def alpaca():
                 )
                 print(order)
                 if order.status == 'accepted':
-                    print (f'Success: User {APCA_API_KEY_ID} - Order to purchase of {qty} shares at ${limit_price} was {order.status}')
-                    return f'Success: Order to purchase of {qty} shares at ${limit_price} was {order.status}', 200
+                    print (f'Success: User {APCA_API_KEY_ID} - Order to purchase of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+                    return f'Success: Order to purchase of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
                 else:
-                    print(f'Error: User {APCA_API_KEY_ID} - Order to purchase of {qty} shares at ${limit_price} was {order.status}')
-                    return f'Error: Order to purchase of {qty} shares at ${limit_price} was {order.status}', 200
+                    print(f'Error: User {APCA_API_KEY_ID} - Order to purchase of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+                    return f'Error: Order to purchase of {qty} shares of {ticker} at ${limit_price} was {order.status}', 200
             else:
-                print(f'Error: User {APCA_API_KEY_ID} - Not enough Buying Power (${buying_power}) to buy at limit price ${limit_price}')
-                return f'Error: Not enough Buying Power (${buying_power}) to buy at limit price ${limit_price}', 200
+                print(f'Error: User {APCA_API_KEY_ID} - Not enough Buying Power (${buying_power}) to buy {ticker} at limit price ${limit_price}')
+                return f'Error: Not enough Buying Power (${buying_power}) to buy {ticker} at limit price ${limit_price}', 200
         print(f'Error: User {APCA_API_KEY_ID} - You have no Buying Power: ${buying_power}')
         return f'Error: You have no Buying Power: ${buying_power}', 200
     else:
