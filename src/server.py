@@ -3,12 +3,8 @@ import requests
 import os
 import alpaca_trade_api as tradeapi
 import json
-from decimal import Decimal
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-import locale
-# if using *nix
-locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 app = Flask(__name__)
 
