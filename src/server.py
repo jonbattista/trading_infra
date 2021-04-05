@@ -1,5 +1,6 @@
 from flask import Flask, request
 import requests
+import os
 import alpaca_trade_api as tradeapi
 import json
 from decimal import Decimal
