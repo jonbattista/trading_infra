@@ -49,7 +49,7 @@ def alpaca():
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
     ticker = json_data['ticker']
-    price = json_data['price']
+    price = Decimal(json_data['price'])
     side = json_data['side']
 
     print(f'ticker is {ticker}')
@@ -68,9 +68,7 @@ def alpaca():
     if not open_orders:
         print('No Open Orders found')
     else:
-        print(open_orders)
-        print(f'{len(open_orders)} Open Orders found!')
-
+        print(f'{len(open_orders)} Open Orders were found!')
 
     buying_power = Decimal(account.buying_power)
             
