@@ -50,7 +50,7 @@ def alpaca():
     ticker = json_data['ticker']
     price = json_data['price']
     side = json_data['side']
-    limit_price = float(price) * float('0.05')
+    limit_price = float(price) * float('1.05')
 
     api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
 
@@ -107,12 +107,15 @@ def alpaca():
             )
             print(order)
             if order.status == 'accepted':
-                return f'Success: Order to purchase of {qty} shares at ${limit_price} was {order.status}'
+                print (f'Success: User {APCA_API_KEY_ID} - Order to purchase of {qty} shares at ${limit_price} was {order.status}')
+                return f'Success: Order to purchase of {qty} shares at ${limit_price} was {order.status}', 200
             else:
-                return f'Error: Order to purchase of {qty} shares at ${limit_price} was {order.status}'
+                print(f'Error: User {APCA_API_KEY_ID} - Order to purchase of {qty} shares at ${limit_price} was {order.status}')
+                return f'Error: Order to purchase of {qty} shares at ${limit_price} was {order.status}', 200
         else:
+            print(f'Error: User {APCA_API_KEY_ID} - Not enough Buying Power (${buying_power}) to buy at limit price ${limit_price}')
             return f'Error: Not enough Buying Power (${buying_power}) to buy at limit price ${limit_price}', 200
-    
+    print(f'Error: User {APCA_API_KEY_ID} - You have no Buying Power: ${buying_power}')
     return f'Error: You have no Buying Power: ${buying_power}', 200
 
 if __name__ == '__main__':
