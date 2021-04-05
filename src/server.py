@@ -121,7 +121,7 @@ def alpaca():
                 print(exception)
 
             if order.status == 'accepted':
-                tqqq_filled_qty = tqqq_position['filled_qty']
+                tqqq_filled_qty = order['filled_qty']
                 result = f'Success: Sale of {tqqq_filled_qty} of TQQQ was {order.status}'
 
                 message = Mail(
