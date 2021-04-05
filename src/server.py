@@ -78,7 +78,7 @@ def alpaca():
     print(f'Buying Power is {buying_power}')
     print(type(price))
     print(price)
-    limit_price = Decimal(price) * Decimal('0.05')
+    limit_price = float(price) * float('0.05')
 
     if buying_power > 0:
         number_of_shares = round(buying_power // limit_price)
