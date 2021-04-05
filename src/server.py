@@ -30,13 +30,14 @@ def alpaca():
         return 'price is not set!', 400
     if json_data['side'] is None:
         return 'side is not set!', 400
-        
+
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
     ticker = json_data['ticker']
     price = json_data['price']
     side = json_data['side']
-
+    limit_price = float(price) * float('0.05')
+    
     api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
 
     account = api.get_account()
@@ -80,7 +81,6 @@ def alpaca():
     else:
         print(f'{len(open_orders)} Open Orders were found!')
 
-    limit_price = float(price) * float('0.05')
 
 
     if buying_power > 0:
