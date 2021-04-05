@@ -65,10 +65,30 @@ def alpaca():
     open_orders = api.list_orders()
     if not open_orders:
         print('Not Open Orders found')
+        print(f'{len(open_orders)} Open Orders found!')
     else:
         print(open_orders)
 
-    portfolio = api.list_positions()
+    #portfolio = api.list_positions()
+    portfolio = {
+      "asset_id": "904837e3-3b76-47ec-b432-046db621571b",
+      "symbol": "AAPL",
+      "exchange": "NASDAQ",
+      "asset_class": "us_equity",
+      "avg_entry_price": "100.0",
+      "qty": "5",
+      "side": "long",
+      "market_value": "600.0",
+      "cost_basis": "500.0",
+      "unrealized_pl": "100.0",
+      "unrealized_plpc": "0.20",
+      "unrealized_intraday_pl": "10.0",
+      "unrealized_intraday_plpc": "0.0084",
+      "current_price": "120.0",
+      "lastday_price": "119.0",
+      "change_today": "0.0084"
+    }
+    
     print(portfolio)
 
     # Buying TQQQ alert
