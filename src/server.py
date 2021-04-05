@@ -126,7 +126,8 @@ def alpaca():
       "lastday_price": "119.0",
       "change_today": "0.0084"
     }
-
+    print(json.loads(tqqq_position))
+    print(json.loads(sqqq_position))
     print(portfolio)
 
     # Buying TQQQ alert
