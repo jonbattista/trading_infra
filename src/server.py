@@ -143,7 +143,7 @@ def alpaca():
             # Sell SQQQ positions at Market
             order = api.submit_order(
                 symbol='SQQQ',
-                qty=sqqq_position.qty,
+                qty=json.loads(sqqq_position.qty),
                 side='sell',
                 type='market',
                 time_in_force=time_in_force,
@@ -163,7 +163,7 @@ def alpaca():
             # Sell TQQQ positions at Market price
             order = api.submit_order(
                 symbol='TQQQ',
-                qty=tqqq_position.qty,
+                qty=json.loads(tqqq_position.qty),
                 side='sell',
                 type='market',
                 time_in_force=time_in_force,
