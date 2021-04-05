@@ -78,10 +78,11 @@ def alpaca():
 
     if buying_power > 0:
         number_of_shares = round(buying_power // limit_price)
+        print(number_of_shares)
         if number_of_shares > 0:
             order = api.submit_order(
                 symbol=ticker,
-                qty=number_of_shares - 1,
+                qty=number_of_shares,
                 side=side,
                 type=order_type,
                 time_in_force=time_in_force,
