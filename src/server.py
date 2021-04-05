@@ -5,6 +5,7 @@ import alpaca_trade_api as tradeapi
 import json
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+from waitress import serve
 
 import logging
 from sys import stdout
@@ -115,4 +116,4 @@ def alpaca():
     return f'Error: You have no Buying Power: ${buying_power}', 200
 
 if __name__ == '__main__':
-  app.run(host='0.0.0.0', port=8080)
+    serve(app, host="0.0.0.0", port=8080)
