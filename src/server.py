@@ -14,10 +14,6 @@ app.debug = True
 
 
 def alpaca():
-    api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
-
-    account = api.get_account()
-
     data = request.data
 
     json_data = json.loads(data)
@@ -34,7 +30,15 @@ def alpaca():
         return 'price is not set!', 400
     if json_data['side'] is None:
         return 'side is not set!', 400
+    
+    api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
 
+    account = api.get_account()
+
+    buying_power = float(account.buying_power)
+            
+    print(f'Buying Power is {buying_power}')
+    
     time_in_force_condition = 'time_in_force' not in json_data
     print(time_in_force_condition)
     if time_in_force_condition:
@@ -76,11 +80,6 @@ def alpaca():
     else:
         print(f'{len(open_orders)} Open Orders were found!')
 
-    buying_power = float(account.buying_power)
-            
-    print(f'Buying Power is {buying_power}')
-    print(type(price))
-    print(price)
     limit_price = float(price) * float('0.05')
 
 
