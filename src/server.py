@@ -36,7 +36,7 @@ def alpaca():
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
 
     if APCA_API_KEY_ID in users_table:
-        user = users_table['APCA_API_KEY_ID']
+        user = users_table[APCA_API_KEY_ID]
     else:
         user = APCA_API_KEY_ID
 
