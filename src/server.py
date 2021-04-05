@@ -88,7 +88,45 @@ def alpaca():
       "lastday_price": "119.0",
       "change_today": "0.0084"
     }
-    
+
+    sqqq_position = {
+      "asset_id": "904837e3-3b76-47ec-b432-046db621571b",
+      "symbol": "SQQQ",
+      "exchange": "NASDAQ",
+      "asset_class": "us_equity",
+      "avg_entry_price": "100.0",
+      "qty": "5",
+      "side": "long",
+      "market_value": "600.0",
+      "cost_basis": "500.0",
+      "unrealized_pl": "100.0",
+      "unrealized_plpc": "0.20",
+      "unrealized_intraday_pl": "10.0",
+      "unrealized_intraday_plpc": "0.0084",
+      "current_price": "120.0",
+      "lastday_price": "119.0",
+      "change_today": "0.0084"
+    }
+
+    tqqq_position = {
+      "asset_id": "904837e3-3b76-47ec-b432-046db621571a",
+      "symbol": "TQQQ",
+      "exchange": "NASDAQ",
+      "asset_class": "us_equity",
+      "avg_entry_price": "100.0",
+      "qty": "5",
+      "side": "long",
+      "market_value": "600.0",
+      "cost_basis": "500.0",
+      "unrealized_pl": "100.0",
+      "unrealized_plpc": "0.20",
+      "unrealized_intraday_pl": "10.0",
+      "unrealized_intraday_plpc": "0.0084",
+      "current_price": "120.0",
+      "lastday_price": "119.0",
+      "change_today": "0.0084"
+    }
+
     print(portfolio)
 
     # Buying TQQQ alert
@@ -97,10 +135,10 @@ def alpaca():
             print('No Open positions found!')
         else:
             # Check if there is an open SQQQ position
-            try:   
-                sqqq_position = api.get_position('SQQQ')
-            except tradeapi.rest.APIError as exception:
-                print(exception)
+            #try:   
+            #    sqqq_position = api.get_position('SQQQ')
+            #except tradeapi.rest.APIError as exception:
+            #    print(exception)
             
             # Sell SQQQ positions at Market
             order = api.submit_order(
@@ -117,10 +155,10 @@ def alpaca():
             print('No Open positions found!')
         else:
             # Check if there is an open TQQQ position
-            try:
-                tqqq_position = api.get_position('TQQQ')
-            except tradeapi.rest.APIError as exception:
-                print(exception)
+            #try:
+            #    tqqq_position = api.get_position('TQQQ')
+            #except tradeapi.rest.APIError as exception:
+            #    print(exception)
 
             # Sell TQQQ positions at Market price
             order = api.submit_order(
