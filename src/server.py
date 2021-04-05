@@ -20,6 +20,10 @@ consoleHandler = logging.StreamHandler(stdout) #set streamhandler to stdout
 consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
+users_table = {
+    'PK37IM0EH8QLLHHJ5CQ0': 'Jon'
+}
+
 app = Flask(__name__)
 
 app.debug = True
@@ -30,6 +34,11 @@ app.debug = True
 def alpaca():
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
+
+    if APCA_API_KEY_ID in users_table:
+        user = users_table['APCA_API_KEY_ID']
+    else:
+        user = APCA_API_KEY_ID
 
     data = request.data
     print(data)
@@ -110,19 +119,19 @@ def alpaca():
                 )
                 print(order)
                 if order.status == 'accepted':
-                    print (f'Success: User {APCA_API_KEY_ID} - Order to purchase of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+                    print (f'Success: User {user} - Order to purchase of {qty} shares of {ticker} at ${limit_price} was {order.status}')
                     return f'Success: Order to purchase of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
                 else:
-                    print(f'Error: User {APCA_API_KEY_ID} - Order to purchase of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+                    print(f'Error: User {user} - Order to purchase of {qty} shares of {ticker} at ${limit_price} was {order.status}')
                     return f'Error: Order to purchase of {qty} shares of {ticker} at ${limit_price} was {order.status}', 200
             else:
-                print(f'Error: User {APCA_API_KEY_ID} - Not enough Buying Power (${buying_power}) to buy {ticker} at limit price ${limit_price}')
+                print(f'Error: User {user} - Not enough Buying Power (${buying_power}) to buy {ticker} at limit price ${limit_price}')
                 return f'Error: Not enough Buying Power (${buying_power}) to buy {ticker} at limit price ${limit_price}', 200
-        print(f'Error: User {APCA_API_KEY_ID} - You have no Buying Power: ${buying_power}')
+        print(f'Error: User {user} - You have no Buying Power: ${buying_power}')
         return f'Error: You have no Buying Power: ${buying_power}', 200
     else:
-        print(f'Error: User {APCA_API_KEY_ID} - Data Payload was empty!')
-        return f'Error: User {APCA_API_KEY_ID} - Data Payload was empty!', 200 
+        print(f'Error: User {user} - Data Payload was empty!')
+        return f'Error: User {user} - Data Payload was empty!', 200 
 
 if __name__ == '__main__':
     serve(app, host="0.0.0.0", port=8080)
