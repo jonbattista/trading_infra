@@ -6,6 +6,19 @@ import json
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
+import logging
+from sys import stdout
+
+# Define logger
+logger = logging.getLogger('mylogger')
+
+logger.setLevel(logging.DEBUG) # set logger level
+logFormatter = logging.Formatter\
+("%(name)-12s %(asctime)s %(levelname)-8s %(filename)s:%(funcName)s %(message)s")
+consoleHandler = logging.StreamHandler(stdout) #set streamhandler to stdout
+consoleHandler.setFormatter(logFormatter)
+logger.addHandler(consoleHandler)
+
 app = Flask(__name__)
 
 app.debug = True
@@ -93,9 +106,9 @@ def alpaca():
             )
             print(order)
             if order.status == 'accepted':
-                return f'Success: Order to purchase of {qty} at ${limit_price} was {order.status}'
+                return f'Success: Order to purchase of {qty} shares at ${limit_price} was {order.status}'
             else:
-                return f'Error: Order to purchase of {qty} at ${limit_price} was {order.status}'
+                return f'Error: Order to purchase of {qty} shares at ${limit_price} was {order.status}'
         else:
             return f'Error: Not enough Buying Power (${buying_power}) to buy at limit price ${limit_price}', 200
     
