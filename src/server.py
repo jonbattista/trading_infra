@@ -90,11 +90,11 @@ def alpaca():
             )
             print(order)
             if order.status == 'accepted':
-                return f'Success: Purchase of {number_of_shares} at ${price} was {order.status}'
+                return f'Success: Purchase of {number_of_shares} at ${limit_price} was {order.status}'
             else:
-                return f'Error: Purchase of {number_of_shares} at ${price} was {order.status}'
+                return f'Error: Purchase of {number_of_shares} at ${limit_price} was {order.status}'
         else:
-            return f'Error: Not enough Buying Power: ${buying_power} to buy {number_of_shares} at limit price {limit_price}', 200
+            return f'Error: Not enough Buying Power(${buying_power}) to buy {number_of_shares} at limit price ${limit_price}', 200
     
     return f'Error: You have no Buying Power: ${buying_power}', 200
 
