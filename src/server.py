@@ -82,7 +82,7 @@ def alpaca():
         print(f'{len(open_orders)} Open Orders were found!')
 
     if buying_power > 0:
-        if qty > 0 && buying_power // qty > 0:
+        if qty > 0 & buying_power // qty > 0:
             order = api.submit_order(
                 symbol=ticker,
                 qty=qty,
