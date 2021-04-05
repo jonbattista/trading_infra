@@ -3,6 +3,8 @@ import requests
 import alpaca_trade_api as tradeapi
 import json
 from decimal import Decimal
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 app = Flask(__name__)
 
@@ -14,10 +16,9 @@ app.debug = True
 def alpaca():
     data = request.data
 
-    print(data)
     json_data = json.loads(data)
-    print(json_data)
-    print(request.args)
+    #print(json_data)
+    #print(request.args)
 
     if request.args.get('APCA_API_KEY_ID') is None:
         return 'APCA_API_KEY_ID is not set!', 400
@@ -93,7 +94,8 @@ def alpaca():
 
     tqqq_position = json.loads('{"asset_id": "904837e3-3b76-47ec-b432-046db621571a","symbol": "TQQQ","exchange": "NASDAQ","asset_class": "us_equity","avg_entry_price": "100.0","qty": "5","side": "long","market_value": "600.0","cost_basis": "500.0","unrealized_pl": "100.0","unrealized_plpc": "0.20","unrealized_intraday_pl": "10.0","unrealized_intraday_plpc": "0.0084","current_price": "120.0","lastday_price": "119.0","change_today": "0.0084"}')
     print(portfolio)
-    # Buying TQQQ alert
+
+    # Recieved a Buy TQQQ alert
     if side == 'buy':
         if not portfolio:
             print('No Open positions found!')
@@ -105,15 +107,51 @@ def alpaca():
             #    print(exception)
             
             # Sell SQQQ positions at Market
-            order = api.submit_order(
-                symbol='SQQQ',
-                qty=sqqq_position['qty'],
-                side='sell',
-                type='market',
-                time_in_force=time_in_force,
-            )
-            
-    # Selling TQQQ alert
+            try:
+                order = api.submit_order(
+                    symbol='SQQQ',
+                    qty=sqqq_position['qty'],
+                    side='sell',
+                    type='market',
+                    time_in_force=time_in_force,
+                )
+            except tradeapi.rest.APIError as exception:
+                print(exception)
+
+            if order.status == 'accepted':
+                result = f'Success: Sale of {tqqq_position.filled_qty} of TQQQ was {order.status}'
+
+                message = Mail(
+                    from_email='alerts@trading.battista.dev',
+                    to_emails='jonbattista@gmail.com',
+                    subject=f'{result}')
+                try:
+                    sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+                    response = sg.send(message)
+                    print(response.status_code)
+                    print(response.body)
+                    print(response.headers)
+                except Exception as e:
+                    print(e.message)
+
+                return result
+            else:
+                result = f'Error: Sale of {tqqq_position.filled_qty} of TQQQ was {order.status}'
+                message = Mail(
+                    from_email='alerts@trading.battista.dev',
+                    to_emails='jonbattista@gmail.com',
+                    subject=f'{result}')
+                try:
+                    sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+                    response = sg.send(message)
+                    print(response.status_code)
+                    print(response.body)
+                    print(response.headers)
+                except Exception as e:
+                    print(e.message)
+                return result
+
+    # Recieved a Sell TQQQ alert
     elif side == 'sell':
         if not portfolio:
             print('No Open positions found!')
@@ -125,13 +163,16 @@ def alpaca():
             #    print(exception)
 
             # Sell TQQQ positions at Market price
-            order = api.submit_order(
-                symbol='TQQQ',
-                qty=tqqq_position['qty'],
-                side='sell',
-                type='market',
-                time_in_force=time_in_force,
-            )
+            try:
+                order = api.submit_order(
+                    symbol='TQQQ',
+                    qty=tqqq_position['qty'],
+                    side='sell',
+                    type='market',
+                    time_in_force=time_in_force,
+                )
+            except tradeapi.rest.APIError as exception:
+                print(exception)
 
             if order.status == 'accepted':
                 return f'Success: Sale of {tqqq_position.filled_qty} of TQQQ was {order.status}'
