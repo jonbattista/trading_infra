@@ -30,7 +30,13 @@ def alpaca():
         return 'price is not set!', 400
     if json_data['side'] is None:
         return 'side is not set!', 400
-    
+        
+    APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
+    APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
+    ticker = json_data['ticker']
+    price = json_data['price']
+    side = json_data['side']
+
     api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
 
     account = api.get_account()
@@ -38,7 +44,7 @@ def alpaca():
     buying_power = float(account.buying_power)
             
     print(f'Buying Power is {buying_power}')
-    
+
     time_in_force_condition = 'time_in_force' not in json_data
     print(time_in_force_condition)
     if time_in_force_condition:
@@ -57,12 +63,6 @@ def alpaca():
         qty = round(buying_power // limit_price)
     else:
         qty = json_data['qty']
-
-    APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
-    APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
-    ticker = json_data['ticker']
-    price = json_data['price']
-    side = json_data['side']
 
     print(f'ticker is {ticker}')
     print(f'price is {price}')
