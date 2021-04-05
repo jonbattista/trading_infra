@@ -14,6 +14,10 @@ app.debug = True
 
 
 def alpaca():
+    api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
+
+    account = api.get_account()
+
     data = request.data
 
     json_data = json.loads(data)
@@ -45,6 +49,11 @@ def alpaca():
     else:
         order_type = json_data['order_type']
 
+    if 'qty' not in json_data:
+        qty = round(buying_power // limit_price)
+    else:
+        qty = json_data['qty']
+
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
     ticker = json_data['ticker']
@@ -56,10 +65,8 @@ def alpaca():
     print(f'side is {side}')
     print(f'time_in_force is {time_in_force}')
     print(f'order_type is {order_type}')
+    print(f'qty is {qty}')
 
-    api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
-
-    account = api.get_account()
 
     if account.trading_blocked:
         return 'Account is currently restricted from trading.', 400
@@ -76,13 +83,12 @@ def alpaca():
     print(price)
     limit_price = float(price) * float('0.05')
 
+
     if buying_power > 0:
-        number_of_shares = round(buying_power // limit_price)
-        print(number_of_shares)
-        if number_of_shares > 0:
+        if qty > 0:
             order = api.submit_order(
                 symbol=ticker,
-                qty=number_of_shares,
+                qty=qty,
                 side=side,
                 type=order_type,
                 time_in_force=time_in_force,
@@ -90,11 +96,11 @@ def alpaca():
             )
             print(order)
             if order.status == 'accepted':
-                return f'Success: Purchase of {number_of_shares} at ${limit_price} was {order.status}'
+                return f'Success: Purchase of {qty} at ${limit_price} was {order.status}'
             else:
-                return f'Error: Purchase of {number_of_shares} at ${limit_price} was {order.status}'
+                return f'Error: Purchase of {qty} at ${limit_price} was {order.status}'
         else:
-            return f'Error: Not enough Buying Power(${buying_power}) to buy {number_of_shares} at limit price ${limit_price}', 200
+            return f'Error: Not enough Buying Power (${buying_power}) to buy at limit price ${limit_price}', 200
     
     return f'Error: You have no Buying Power: ${buying_power}', 200
 
