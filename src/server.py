@@ -21,7 +21,7 @@ consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
 users_table = {
-    'PK37IM0EH8QLLHHJ5CQ0': 'Jon',
+    'PK86UONPIG3S7CDKS0DD': 'Jon',
     #'': 'Jose',
     'PKSVMKPIHFFHFQMM61SU': 'Adam',
     'PK1BLDQH2VVZC7M5FNJB': 'Daniel'
@@ -43,6 +43,7 @@ def alpaca():
     else:
         user = APCA_API_KEY_ID
 
+    print(f'User is {user}')
     data = request.data
     print(data)
     if(request.data):
@@ -104,7 +105,6 @@ def alpaca():
         print(f'time_in_force is {time_in_force}')
         print(f'order_type is {order_type}')
         print(f'qty is {qty}')
-
 
         if account.trading_blocked:
             return 'Account is currently restricted from trading.', 400
