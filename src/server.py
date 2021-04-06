@@ -125,7 +125,7 @@ def alpaca():
                         time_in_force=time_in_force,
                         limit_price=limit_price
                     )
-                except alpaca_trade_api.rest.APIError as e:
+                except tradeapi.rest.APIError as e:
                   print(e)
                   return f'{e}', 500
                 print(order)
