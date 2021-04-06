@@ -116,14 +116,18 @@ def alpaca():
 
         if buying_power > 0:
             if qty > 0 and buying_power // qty > 0:
-                order = api.submit_order(
-                    symbol=ticker,
-                    qty=qty,
-                    side=side,
-                    type=order_type,
-                    time_in_force=time_in_force,
-                    limit_price=limit_price
-                )
+                try:
+                    order = api.submit_order(
+                        symbol=ticker,
+                        qty=qty,
+                        side=side,
+                        type=order_type,
+                        time_in_force=time_in_force,
+                        limit_price=limit_price
+                    )
+                except alpaca_trade_api.rest.APIError as e:
+                  print(e)
+                  return f'{e}', 500
                 print(order)
                 if order.status == 'accepted':
                     print (f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
