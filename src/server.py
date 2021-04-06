@@ -45,7 +45,9 @@ def alpaca():
 
     print(f'User is {user}')
     data = request.data
+    form = request.form
     print(data)
+    print(form)
     if(request.data):
         try:
             json_data = json.loads(data)
