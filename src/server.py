@@ -126,7 +126,7 @@ def alpaca():
                         limit_price=limit_price
                     )
                 except tradeapi.rest.APIError as e:
-                    if e is 'account is not authorized to trade':
+                    if e == 'account is not authorized to trade':
                         print(f'Error: {e} - Check your API Keys exist')
                         return f'Error: {e} - Check your API Keys exist', 500
                     else:
