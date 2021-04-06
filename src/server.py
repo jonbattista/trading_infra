@@ -23,6 +23,8 @@ logger.addHandler(consoleHandler)
 users_table = {
     'PK37IM0EH8QLLHHJ5CQ0': 'Jon',
     'PK37IM0EH8QLLHHJ5CQ0': 'Jose',
+    'PKSVMKPIHFFHFQMM61SU': 'Adam',
+    'PK1BLDQH2VVZC7M5FNJB': 'Daniel'
 }
 
 app = Flask(__name__)
@@ -44,7 +46,11 @@ def alpaca():
     data = request.data
     print(data)
     if(request.data):
-        json_data = json.loads(data)
+        try:
+            json_data = json.loads(data)
+        except json.decoder.JSONDecodeError as e:
+            print(f'Error parsing JSON: {e}')
+            return f'Error parsing JSON: {e}', 500
         #print(json_data)
         #print(request.args)
 
@@ -120,15 +126,15 @@ def alpaca():
                 )
                 print(order)
                 if order.status == 'accepted':
-                    print (f'Success: User {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+                    print (f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
                     return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
                 else:
-                    print(f'Error: User {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+                    print(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
                     return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 200
             else:
-                print(f'Error: User {user} - Not enough Buying Power (${buying_power}) to buy {ticker} at limit price ${limit_price}')
+                print(f'Error: User: {user} - Not enough Buying Power (${buying_power}) to buy {ticker} at limit price ${limit_price}')
                 return f'Error: Not enough Buying Power (${buying_power}) to buy {ticker} at limit price ${limit_price}', 200
-        print(f'Error: User {user} - You have no Buying Power: ${buying_power}')
+        print(f'Error: User: {user} - You have no Buying Power: ${buying_power}')
         return f'Error: You have no Buying Power: ${buying_power}', 200
     else:
         print(f'Error: User {user} - Data Payload was empty!')
