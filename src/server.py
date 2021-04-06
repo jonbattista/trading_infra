@@ -126,8 +126,12 @@ def alpaca():
                         limit_price=limit_price
                     )
                 except tradeapi.rest.APIError as e:
-                  print(e)
-                  return f'{e}', 500
+                    if e is 'account is not authorized to trade':
+                        print(f'Error: {e} - Check your API Keys exist')
+                        return f'Error: {e} - Check your API Keys exist', 500
+                    else:
+                        print(e)
+                        return f'{e}', 500
                 print(order)
                 if order.status == 'accepted':
                     print (f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
