@@ -22,7 +22,7 @@ logger.addHandler(consoleHandler)
 
 users_table = {
     'PK37IM0EH8QLLHHJ5CQ0': 'Jon',
-    'PK37IM0EH8QLLHHJ5CQ0': 'Jose',
+    #'': 'Jose',
     'PKSVMKPIHFFHFQMM61SU': 'Adam',
     'PK1BLDQH2VVZC7M5FNJB': 'Daniel'
 }
