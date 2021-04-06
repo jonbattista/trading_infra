@@ -69,7 +69,7 @@ def alpaca():
         ticker = json_data['ticker']
         price = json_data['price']
         side = json_data['side']
-        limit_price = float(price) * float('1.05')
+        limit_price = float(price) * float('1.005')
 
         api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
 
