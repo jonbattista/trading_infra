@@ -21,7 +21,8 @@ consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
 users_table = {
-    'PK37IM0EH8QLLHHJ5CQ0': 'Jon'
+    'PK37IM0EH8QLLHHJ5CQ0': 'Jon',
+    'PK37IM0EH8QLLHHJ5CQ0': 'Jose',
 }
 
 app = Flask(__name__)
@@ -119,11 +120,11 @@ def alpaca():
                 )
                 print(order)
                 if order.status == 'accepted':
-                    print (f'Success: User {user} - Order to purchase of {qty} shares of {ticker} at ${limit_price} was {order.status}')
-                    return f'Success: Order to purchase of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
+                    print (f'Success: User {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+                    return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
                 else:
-                    print(f'Error: User {user} - Order to purchase of {qty} shares of {ticker} at ${limit_price} was {order.status}')
-                    return f'Error: Order to purchase of {qty} shares of {ticker} at ${limit_price} was {order.status}', 200
+                    print(f'Error: User {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+                    return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 200
             else:
                 print(f'Error: User {user} - Not enough Buying Power (${buying_power}) to buy {ticker} at limit price ${limit_price}')
                 return f'Error: Not enough Buying Power (${buying_power}) to buy {ticker} at limit price ${limit_price}', 200
