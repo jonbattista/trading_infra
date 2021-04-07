@@ -44,7 +44,7 @@ def alpaca():
         user = APCA_API_KEY_ID
 
     print(f'User is {user}')
-    data = request.data()
+    data = request.get_data()
 
     print(f'Data: {data}')
 
