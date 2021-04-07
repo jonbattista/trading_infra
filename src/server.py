@@ -44,11 +44,9 @@ def alpaca():
         user = APCA_API_KEY_ID
 
     print(f'User is {user}')
-    data = request.data
-    form = request.form.to_dict()
+    data = request.data()
 
-    print(data)
-    print(form)
+    print(f'Data: {data}')
 
     if(request.data):
         try:
@@ -86,11 +84,10 @@ def alpaca():
 
         buying_power = float(account.buying_power)
                 
-        print(f'Buying Power is {buying_power}')
+        print(f'Buying Power is ${buying_power}')
 
         # Get Time-In-Force
         time_in_force_condition = 'time_in_force' not in json_data
-        print(time_in_force_condition)
         if time_in_force_condition:
             time_in_force = 'day'
         else:
@@ -98,7 +95,6 @@ def alpaca():
 
         # Get Order Type
         order_type_condition = 'type' not in json_data
-        print(order_type_condition)
         if order_type_condition:
             order_type = 'limit'
         else:
