@@ -68,12 +68,12 @@ def alpaca():
         price = json_data['price']
         side = json_data['side']
         if side == 'buy':
-            limit_price = float(price) * float('1.005')
-            diff = abs(limit_price - price)
+            limit_price = round(float(price) * float('1.005'),2)
+            diff = round(abs(limit_price - price),2)
             print(f'Buying Limit Price is: {price} + {diff} = {limit_price}')
         elif side == 'sell':
-            limit_price = float(price) * float('-1.005')
-            diff = abs(price - limit_price)
+            limit_price = round(float(price) * float('-1.005'),2)
+            diff = round(abs(price - limit_price),2)
             print(f'Selling Limit Price is: {price} + {diff} = {limit_price}')
 
         # Check if Live or Paper Trading
