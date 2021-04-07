@@ -171,7 +171,7 @@ def alpaca():
                     print (f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
 
                     # Check that order if filled
-                    watchOrderFilledStatus(order_id)
+                    #watchOrderFilledStatus(order_id)
 
                     return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
                 else:
