@@ -77,13 +77,13 @@ def alpaca():
             print(f'Selling Limit Price is: {price} + {diff} = {limit_price}')
 
         # Check if Live or Paper Trading
-        if APCA_API_KEY_ID[0:2] = 'PK'
+        if APCA_API_KEY_ID[0:2] == 'PK':
             api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
             print('Using Paper Trading API')
-        elif APCA_API_KEY_ID[0:2] = 'AK'
+        elif APCA_API_KEY_ID[0:2] == 'AK':
             api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://api.alpaca.markets')
             print('Using Live Trading API')
-        else
+        else:
             return 'Error: API Key is malformed.', 500
 
         # Get Account information
