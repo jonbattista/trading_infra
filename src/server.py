@@ -121,9 +121,15 @@ def alpaca():
 
         # Get Quantity
         if 'qty' not in json_data:
-            qty = round(buying_power // limit_price)
+            qty = math.floor(buying_power // limit_price)
         else:
             qty = json_data['qty']
+
+        # Get Stop Loss
+        if 'stop_loss' not in json_data:
+            stop_loss = math.floor(buying_power // limit_price)
+        else:
+            print('Not using a Stop Loss!')
 
         print(f'ticker is {ticker}')
         #print(f'price is {price}')
@@ -148,7 +154,7 @@ def alpaca():
 
         # Submit Order
         if buying_power > 0:
-            if qty > 0 and buying_power // qty > 0:
+            if qty > 0 and math.floor(buying_power // qty > 0):
                 try:
                     order = api.submit_order(
                         symbol=ticker,
@@ -157,7 +163,9 @@ def alpaca():
                         type=order_type,
                         time_in_force=time_in_force,
                         limit_price=limit_price,
-                        client_order_id=order_id
+                        client_order_id=order_id,
+                        #order_class='oto',
+                        #stop_loss={'stop_price': limit_price * 0.995}
                     )
                 except tradeapi.rest.APIError as e:
                     if e == 'account is not authorized to trade':
