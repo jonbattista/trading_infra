@@ -89,11 +89,11 @@ def alpaca():
         # Check if Live or Paper Trading
         if APCA_API_KEY_ID[0:2] == 'PK':
             api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
-            wss = tradeapi.stream2.StreamConn(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'wss://paper-api.alpaca.markets/stream')
+            #wss = tradeapi.stream2.StreamConn(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'wss://paper-api.alpaca.markets/stream')
             print('Using Paper Trading API')
         elif APCA_API_KEY_ID[0:2] == 'AK':
             api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://api.alpaca.markets')
-            wss = tradeapi.stream2.StreamConn(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'wss://api.alpaca.markets/stream')
+            #wss = tradeapi.stream2.StreamConn(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'wss://api.alpaca.markets/stream')
             print('Using Live Trading API')
         else:
             return 'Error: API Key is malformed.', 500
