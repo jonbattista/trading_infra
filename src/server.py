@@ -2,6 +2,7 @@ from flask import Flask, request
 import requests
 import os
 import alpaca_trade_api as tradeapi
+from alpaca_trade_api.common import URL
 import json
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
@@ -24,7 +25,7 @@ users_table = {
     'PKI8VO3NCM8G2NJ0SX0O': 'Jose',
     'PKSVMKPIHFFHFQMM61SU': 'Adam',
     'PK1BLDQH2VVZC7M5FNJB': 'Daniel'
-}
+}    
 
 app = Flask(__name__)
 
@@ -32,15 +33,6 @@ app.debug = True
 
 @app.route('/', methods=["POST"])
 
-def watchOrderFilledStatus(conn, order_id):
-
-    client_order_id = f'{order_id}'
-    @conn.on(client_order_id)
-    async def on_msg(conn, channel, data):
-        # Print the update to the console.
-        print("Update for {}. Event: {}.".format(client_order_id, data['event']))
-
-    conn.run(['trade_updates'])
 
 def alpaca():
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
@@ -89,11 +81,11 @@ def alpaca():
         # Check if Live or Paper Trading
         if APCA_API_KEY_ID[0:2] == 'PK':
             api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
-            wss = tradeapi.stream2.StreamConn(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'wss://paper-api.alpaca.markets/stream')
+            wss_url = 'wss://paper-api.alpaca.markets/stream'
             print('Using Paper Trading API')
         elif APCA_API_KEY_ID[0:2] == 'AK':
             api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://api.alpaca.markets')
-            wss = tradeapi.stream2.StreamConn(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'wss://api.alpaca.markets/stream')
+            wss_url = 'wss://api.alpaca.markets/stream'
             print('Using Live Trading API')
         else:
             return 'Error: API Key is malformed.', 500
@@ -171,7 +163,14 @@ def alpaca():
                     print (f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
 
                     # Check that order if filled
-                    watchOrderFilledStatus(wss, order_id)
+                    conn = tradeapi.stream2.StreamConn(APCA_API_KEY_ID, APCA_API_SECRET_KEY, base_url=URL(wss_url))
+                    print(order_id)
+                    @conn.on(order_id)
+                    async def on_msg(conn, channel, data):
+                        # Print the update to the console.
+                        print("Update for {}. Event: {}.".format(order_id, data['event']))
+
+                    conn.run(['trade_updates'])
 
                     return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
                 else:
