@@ -22,7 +22,7 @@ logger.addHandler(consoleHandler)
 
 users_table = {
     'PK86UONPIG3S7CDKS0DD': 'Jon',
-    #'': 'Jose',
+    'PKI8VO3NCM8G2NJ0SX0O': 'Jose',
     'PKSVMKPIHFFHFQMM61SU': 'Adam',
     'PK1BLDQH2VVZC7M5FNJB': 'Daniel'
 }
@@ -46,16 +46,16 @@ def alpaca():
     print(f'User is {user}')
     data = request.data
     form = request.form.to_dict()
+
     print(data)
     print(form)
+
     if(request.data):
         try:
             json_data = json.loads(data)
         except json.decoder.JSONDecodeError as e:
             print(f'Error parsing JSON: {e}')
             return f'Error parsing JSON: {e}', 500
-        #print(json_data)
-        #print(request.args)
 
         if request.args.get('APCA_API_KEY_ID') is None:
             return 'APCA_API_KEY_ID is not set!', 400
@@ -68,11 +68,17 @@ def alpaca():
         if json_data['side'] is None:
             return 'side is not set!', 400
 
-        
         ticker = json_data['ticker']
         price = json_data['price']
         side = json_data['side']
-        limit_price = float(price) * float('1.005')
+        if side == 'buy':
+            limit_price = float(price) * float('1.005')
+            diff = abs(limit_price - price)
+            print(f'Buying Limit Price is {limit_price} which is a difference of {diff} from {price}')
+        elif side == 'sell':
+            limit_price = float(price) * float('-1.005')
+            diff = abs(price - limit_price)
+            print(f'Selling Limit Price is {limit_price} which is a difference of {diff} from {price}')
 
         api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
 
@@ -82,6 +88,7 @@ def alpaca():
                 
         print(f'Buying Power is {buying_power}')
 
+        # Get Time-In-Force
         time_in_force_condition = 'time_in_force' not in json_data
         print(time_in_force_condition)
         if time_in_force_condition:
@@ -89,6 +96,7 @@ def alpaca():
         else:
             time_in_force = json_data['time_in_force']
 
+        # Get Order Type
         order_type_condition = 'type' not in json_data
         print(order_type_condition)
         if order_type_condition:
@@ -102,7 +110,7 @@ def alpaca():
             qty = json_data['qty']
 
         print(f'ticker is {ticker}')
-        print(f'price is {price}')
+        #print(f'price is {price}')
         print(f'side is {side}')
         print(f'time_in_force is {time_in_force}')
         print(f'order_type is {order_type}')
