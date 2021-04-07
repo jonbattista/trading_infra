@@ -6,7 +6,7 @@ import json
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from waitress import serve
-
+import uuid
 import logging
 from sys import stdout
 
@@ -31,6 +31,16 @@ app = Flask(__name__)
 app.debug = True
 
 @app.route('/', methods=["POST"])
+
+def watchOrderFilledStatus(conn, order_id):
+
+    client_order_id = f'{order_id}'
+    @conn.on(client_order_id)
+    async def on_msg(conn, channel, data):
+        # Print the update to the console.
+        print("Update for {}. Event: {}.".format(client_order_id, data['event']))
+
+    conn.run(['trade_updates'])
 
 def alpaca():
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
@@ -70,18 +80,20 @@ def alpaca():
         if side == 'buy':
             limit_price = round(float(price) * float('1.005'),2)
             diff = round(abs(limit_price - price),2)
-            print(f'Buying Limit Price is: {price} + {diff} = {limit_price}')
+            print(f'Buying Limit Price is: ${price} + ${diff} = ${limit_price}')
         elif side == 'sell':
-            limit_price = round(float(price) * float('-1.005'),2)
-            diff = round(abs(price - limit_price),2)
-            print(f'Selling Limit Price is: {price} + {diff} = {limit_price}')
+            limit_price = round(abs(float(price) * float('0.995')),2)
+            diff = round(abs(limit_price - price),2)
+            print(f'Selling Limit Price is: ${price} + ${diff} = ${limit_price}')
 
         # Check if Live or Paper Trading
         if APCA_API_KEY_ID[0:2] == 'PK':
             api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
+            wss = tradeapi.stream2.StreamConn(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'wss://paper-api.alpaca.markets/stream')
             print('Using Paper Trading API')
         elif APCA_API_KEY_ID[0:2] == 'AK':
             api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://api.alpaca.markets')
+            wss = tradeapi.stream2.StreamConn(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'wss://api.alpaca.markets/stream')
             print('Using Live Trading API')
         else:
             return 'Error: API Key is malformed.', 500
@@ -131,6 +143,9 @@ def alpaca():
         else:
             print(f'{len(open_orders)} Open Orders were found!')
 
+        # Generate Order ID
+        order_id = str(uuid.uuid4())
+
         # Submit Order
         if buying_power > 0:
             if qty > 0 and buying_power // qty > 0:
@@ -141,7 +156,8 @@ def alpaca():
                         side=side,
                         type=order_type,
                         time_in_force=time_in_force,
-                        limit_price=limit_price
+                        limit_price=limit_price,
+                        client_order_id=order_id
                     )
                 except tradeapi.rest.APIError as e:
                     if e == 'account is not authorized to trade':
@@ -153,6 +169,10 @@ def alpaca():
                 print(order)
                 if order.status == 'accepted':
                     print (f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+
+                    # Check that order if filled
+                    watchOrderFilledStatus(order_id)
+
                     return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
                 else:
                     print(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
