@@ -45,7 +45,7 @@ def alpaca():
 
     print(f'User is {user}')
     data = request.data
-    form = request.form
+    form = request.form.to_dict()
     print(data)
     print(form)
     if(request.data):
