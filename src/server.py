@@ -32,15 +32,15 @@ app.debug = True
 
 @app.route('/', methods=["POST"])
 
-def watchOrderFilledStatus(conn, order_id):
+#def watchOrderFilledStatus(conn, order_id):#
 
-    client_order_id = f'{order_id}'
-    @conn.on(client_order_id)
-    async def on_msg(conn, channel, data):
-        # Print the update to the console.
-        print("Update for {}. Event: {}.".format(client_order_id, data['event']))
+#    client_order_id = f'{order_id}'
+#    @conn.on(client_order_id)
+#    async def on_msg(conn, channel, data):
+#        # Print the update to the console.
+#        print("Update for {}. Event: {}.".format(client_order_id, data['event']))#
 
-    conn.run(['trade_updates'])
+#    conn.run(['trade_updates'])
 
 def alpaca():
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
