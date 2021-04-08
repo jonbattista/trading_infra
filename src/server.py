@@ -128,6 +128,7 @@ def alpaca():
 
         # Get Stop Loss
         if 'stop' not in json_data:
+            stop = None
             print('Not using a Stop Loss!')
         else:
             stop = json_data['stop']
@@ -158,6 +159,9 @@ def alpaca():
         # Get Positions
         portfolio = api.list_positions()
         print(portfolio)
+
+        position = next((position for position in portfolio if position["symbol"] == ticker), None)
+
         # Check if there is already a Position for Ticker
         if ticker in portfolio and side == 'buy':
             print(f'Error: User: {user} - You already have an Open Position in {ticker}')
