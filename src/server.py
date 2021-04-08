@@ -129,9 +129,9 @@ def alpaca():
         # Get Stop Loss
         if 'stop' not in json_data:
             print('Not using a Stop Loss!')
-            print(f'Stop Loss is {stop}')
         else:
             stop = json_data['stop']
+            print(f'Stop Loss is {stop}')
 
         # Prin Variables
         print(f'Ticker is {ticker}')
