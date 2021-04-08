@@ -22,34 +22,93 @@ consoleHandler = logging.StreamHandler(stdout)
 consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
-def watchOrderFilledStatus(ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop):
-    time.sleep(10)
-    order = get_order_by_client_order_id(order_id)
+def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop):
+    time.sleep(2)
+    print(f'Checking Status for Order: {order_id}')
+    order = api.get_order_by_client_order_id(order_id)
     count = 0
 
-    while order.status == 'accepted' and count < 2:
-        order = get_order_by_client_order_id(order_id)
-        api.cancel_order(order_id)
+    while order.status == 'accepted' or order.status == 'new' and count < 2:
+        print(f'Order Check Count is {count}')
+        #print(order_id)
+        #orders = api.list_orders()
+        #print(orders)
+
+        url = f'https://paper-api.alpaca.markets/v2/orders'
+        #print(url)
+        headers = {'APCA-API-KEY-ID':APCA_API_KEY_ID,'APCA-API-SECRET-KEY':APCA_API_SECRET_KEY}
+        #print(headers)
+        order = requests.get(f'{url}:by_client_order_id?client_order_id={order_id}', headers=headers)
+        #print(order.content)
+        #print(order_id)
+        order = api.get_order_by_client_order_id(order_id)
+
+        print(order)
+
+        #api.cancel_order(order_id)
 
         # Generate new Order ID
         order_id = str(uuid.uuid4())
 
         # Modify Buy Limit Price by +0.1%
         if side == 'buy':
-            new_limit_price = limit_price * 1.001
+            new_limit_price = round(limit_price * 1.001, 2)
+            if stop is not None:
+                new_stop = round(stop * 1.01, 2)
+                data = {
+                'qty':qty,
+                'side': side,
+                'type': order_type,
+                'time_in_force': time_in_force,
+                'limit_price': limit_price,
+                'stop_price': stop,
+                order_class='oto'
+                }
 
-            new_stop = stop * 1.01
+                order = requests.patch(f'{url}/{order_id}', data=data, headers=headers)
+                print(order.content)
 
-            print(f'Buy Limit Price was changed from {limit_price} to {new_limit_price}')
-            print(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
+                print(f'Buy Limit Price was changed from {limit_price} to {new_limit_price}')
+                print(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
+            else:
+                data = {
+                'qty':qty,
+                'side': side,
+                'type': order_type,
+                'time_in_force': time_in_force,
+                'limit_price': limit_price,
+                'client_order_id': order_id
+                }
+                order = requests.patch(f'{url}/{order_id}', data=data, headers=headers)
+                print(order.content)
+
+                print(f'Buy Limit Price was changed from {limit_price} to {new_limit_price}')
         # Modify Sell Limit Price by -0.1%
         elif side == 'sell':
-            new_limit_price = limit_price * .999
+            new_limit_price = round(limit_price * .999, 2)
 
-            new_stop = stop * .999
+            if stop is not None:
+                new_stop = round(stop * .999, 2)
+                data = {
+                'qty':qty,
+                'side': side,
+                'type': order_type,
+                'time_in_force': time_in_force,
+                'limit_price': limit_price,
+                'stop_price': stop, 
+                'client_order_id': order_id
+                }
+                order = requests.patch(f'{url}/{order_id}', data=data, headers=headers)
+                print(order.content)
 
-            print(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
-            print(f'Sell Stop Loss Price was changed from {stop} to {new_stop}')
+                print(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
+                print(f'Sell Stop Loss Price was changed from {stop} to {new_stop}')
+            else:
+                data = {'limit_price': limit_price, 'client_order_id': order_id}
+                order = requests.patch(f'{url}/{order_id}', data=data, headers=headers)
+                print(order.content)
+
+                print(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
         
         order = submitOrder(api,ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop)
 
@@ -57,13 +116,14 @@ def watchOrderFilledStatus(ticker, qty, side, order_type, time_in_force, limit_p
         count += 1
 
     if order.status == 'filled' :
-        print (f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+        print (f'Success: User: {APCA_API_KEY_ID} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
         return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
     else:
-        print(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+        print(f'Error: User: {APCA_API_KEY_ID} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
         return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 500
+    return 500
 
-def submitOrder(api,ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop):
+def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop):
     # Submit Order with Stop Loss
     if stop is not None:
         try:
@@ -104,7 +164,9 @@ def submitOrder(api,ticker, qty, side, order_type, time_in_force, limit_price, o
             else:
                 print(e)
                 return f'{e}', 500
-    return order.status
+    print(order_id)
+    print(order)
+    return order
 
 app = Flask(__name__)
 
@@ -114,18 +176,18 @@ app.debug = True
 
 def alpaca():
     if request.args.get('token') is None:
-        return 401
+        return 'Unauthorized', 401
 
     if request.args.get('token') != "XcYrXRtFXaNjTFXTFtQDMbsrmnmwygvuTa":
-        return 401
+        return 'Unauthorized', 401
 
     now = datetime.now()
     market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
     market_close = now.replace(hour=20, minute=0, second=0, microsecond=0)
 
-    if now < market_open or now > market_close:
-        print(f"Market is Closed - {time.strftime('%l:%M %p')}")
-        return f"Market is Closed - {time.strftime('%l:%M %p')}", 404
+    #if now < market_open or now > market_close:
+#        print(f"Market is Closed - {time.strftime('%l:%M %p')}")
+#        return f"Market is Closed - {time.strftime('%l:%M %p')}", 404
 
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
@@ -197,7 +259,7 @@ def alpaca():
         # Get Order Type
         order_type_condition = 'type' not in json_data
         if order_type_condition:
-            order_type = 'limit'
+            order_type = 'stop_limit'
         else:
             order_type = json_data['order_type']
 
@@ -210,6 +272,7 @@ def alpaca():
         # Get Stop Loss
         if 'stop' not in json_data:
             print('Not using a Stop Loss!')
+            stop = None
         else:
             stop = json_data['stop'] - (stop * 0.01)
 
@@ -249,14 +312,14 @@ def alpaca():
             print(f'buying power check {math.floor(buying_power // qty > 0)}')
             if qty > 0 and math.floor(buying_power // qty > 0):
                 
-                order_status = submitOrder(api,ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop)
-
-                print(order_status)
-                if order_status == 'accepted':
+                order = submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop)
+                print(order_id)
+                if order.status == 'accepted':
                     print (f'Pending: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
 
                     # Check that order if filled
-                    watchOrderFilledStatus(ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop)
+                    watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop)
+
                 else:
                     print(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
                     return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 500
