@@ -52,7 +52,7 @@ def alpaca():
     else:
         user = APCA_API_KEY_ID
 
-    print(f'User is {user}')
+    print(f'\n\nUser is {user}')
     data = request.get_data()
 
     print(f'Data: {data}')
@@ -127,17 +127,19 @@ def alpaca():
             qty = json_data['qty']
 
         # Get Stop Loss
-        if 'stop_loss' not in json_data:
-            stop_loss = math.floor(buying_power // limit_price)
-        else:
+        if 'stop' not in json_data:
             print('Not using a Stop Loss!')
+        else:
+            stop = json_data['stop']
 
-        print(f'ticker is {ticker}')
-        #print(f'price is {price}')
-        print(f'side is {side}')
-        print(f'time_in_force is {time_in_force}')
-        print(f'order_type is {order_type}')
-        print(f'qty is {qty}')
+        # Prin Variables
+        print(f'Ticker is {ticker}')
+        print(f'Original Price is {price}')
+        print(f'Side is {side}')
+        print(f'Time-In-Force is {time_in_force}')
+        print(f'Order Type is {order_type}')
+        print(f'Quantity is {qty}')
+        print(f'Stop Loss is {stop}')
 
         # Check if Account is Blocked
         if account.trading_blocked:
@@ -153,28 +155,58 @@ def alpaca():
         # Generate Order ID
         order_id = str(uuid.uuid4())
 
-        # Submit Order
+        # Get Positions
+        portfolio = api.list_positions()
+
+        # Check if there is already a Position for Ticker
+        if ticker in portfolio:
+            print(f'Error: User: {user} - You already have an Open Position in {ticker}')
+            return f'Error: You already have an Open Position in {ticker}', 500
+
+        # Order Flow
         if buying_power > 0:
+            print(f'buying power check {math.floor(buying_power // qty > 0)}')
             if qty > 0 and math.floor(buying_power // qty > 0):
-                try:
-                    order = api.submit_order(
-                        symbol=ticker,
-                        qty=qty,
-                        side=side,
-                        type=order_type,
-                        time_in_force=time_in_force,
-                        limit_price=limit_price,
-                        client_order_id=order_id,
-                        #order_class='oto',
-                        #stop_loss={'stop_price': limit_price * 0.995}
-                    )
-                except tradeapi.rest.APIError as e:
-                    if e == 'account is not authorized to trade':
-                        print(f'Error: {e} - Check your API Keys exist')
-                        return f'Error: {e} - Check your API Keys exist', 500
-                    else:
-                        print(e)
-                        return f'{e}', 500
+                # Submit Order with Stop Loss
+                if stop is not None:
+                    try:
+                        order = api.submit_order(
+                            symbol=ticker,
+                            qty=qty,
+                            side=side,
+                            type=order_type,
+                            time_in_force=time_in_force,
+                            limit_price=limit_price,
+                            client_order_id=order_id,
+                            order_class='oto',
+                            stop={'stop_price': stop }
+                        )
+                    except tradeapi.rest.APIError as e:
+                        if e == 'account is not authorized to trade':
+                            print(f'Error: {e} - Check your API Keys exist')
+                            return f'Error: {e} - Check your API Keys exist', 500
+                        else:
+                            print(e)
+                            return f'{e}', 500
+                # Submit Order without Stop Loss
+                else:
+                    try:
+                        order = api.submit_order(
+                            symbol=ticker,
+                            qty=qty,
+                            side=side,
+                            type=order_type,
+                            time_in_force=time_in_force,
+                            limit_price=limit_price,
+                            client_order_id=order_id
+                        )
+                    except tradeapi.rest.APIError as e:
+                        if e == 'account is not authorized to trade':
+                            print(f'Error: {e} - Check your API Keys exist')
+                            return f'Error: {e} - Check your API Keys exist', 500
+                        else:
+                            print(e)
+                            return f'{e}', 500
                 print(order)
                 if order.status == 'accepted':
                     print (f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
