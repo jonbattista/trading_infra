@@ -159,9 +159,13 @@ def alpaca():
         portfolio = api.list_positions()
 
         # Check if there is already a Position for Ticker
-        if ticker in portfolio:
+        if ticker in portfolio and side == 'buy':
             print(f'Error: User: {user} - You already have an Open Position in {ticker}')
             return f'Error: You already have an Open Position in {ticker}', 500
+        # Check if you are trying to sell something you dont have
+        elif ticker not in portfolio and side == 'sell':
+            print(f'Error: User: {user} - You have no {ticker} to Sell')
+            return f'Error: You have no {ticker} to Sell', 500
 
         # Order Flow
         if buying_power > 0:
