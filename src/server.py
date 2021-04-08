@@ -157,7 +157,7 @@ def alpaca():
 
         # Get Positions
         portfolio = api.list_positions()
-
+        print(portfolio)
         # Check if there is already a Position for Ticker
         if ticker in portfolio and side == 'buy':
             print(f'Error: User: {user} - You already have an Open Position in {ticker}')
