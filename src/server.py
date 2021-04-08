@@ -159,15 +159,14 @@ def alpaca():
         # Get Positions
         portfolio = api.list_positions()
         print(portfolio)
-
-        position = next((position for position in portfolio if position["symbol"] == ticker), None)
+        position = next((position for position in portfolio if position.symbol == ticker), None)
 
         # Check if there is already a Position for Ticker
-        if ticker in portfolio and side == 'buy':
+        if position is not None and side == 'buy':
             print(f'Error: User: {user} - You already have an Open Position in {ticker}')
             return f'Error: You already have an Open Position in {ticker}', 500
         # Check if you are trying to sell something you dont have
-        elif ticker not in portfolio and side == 'sell':
+        elif position is None and side == 'sell':
             print(f'Error: User: {user} - You have no {ticker} to Sell')
             return f'Error: You have no {ticker} to Sell', 500
 
@@ -187,7 +186,7 @@ def alpaca():
                             limit_price=limit_price,
                             client_order_id=order_id,
                             order_class='oto',
-                            stop={'stop_price': stop }
+                            stop_loss={'stop_price': stop }
                         )
                     except tradeapi.rest.APIError as e:
                         if e == 'account is not authorized to trade':
