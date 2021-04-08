@@ -54,7 +54,7 @@ def watchOrderFilledStatus(ticker, qty, side, order_type, time_in_force, limit_p
         order = submitOrder(api,ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop)
 
         time.sleep(10)
-        count ++
+        count += 1
 
     if order.status == 'filled' :
         print (f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
@@ -62,7 +62,6 @@ def watchOrderFilledStatus(ticker, qty, side, order_type, time_in_force, limit_p
     else:
         print(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
         return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 500
-
 
 def submitOrder(api,ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop):
     # Submit Order with Stop Loss
@@ -114,6 +113,12 @@ app.debug = True
 @app.route('/', methods=["POST"])
 
 def alpaca():
+    if request.args.get('token') is None:
+        return 401
+
+    if request.args.get('token') != "XcYrXRtFXaNjTFXTFtQDMbsrmnmwygvuTa":
+        return 401
+
     now = datetime.now()
     market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
     market_close = now.replace(hour=20, minute=0, second=0, microsecond=0)
