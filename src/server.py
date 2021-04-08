@@ -129,6 +129,7 @@ def alpaca():
         # Get Stop Loss
         if 'stop' not in json_data:
             print('Not using a Stop Loss!')
+            print(f'Stop Loss is {stop}')
         else:
             stop = json_data['stop']
 
@@ -139,7 +140,6 @@ def alpaca():
         print(f'Time-In-Force is {time_in_force}')
         print(f'Order Type is {order_type}')
         print(f'Quantity is {qty}')
-        print(f'Stop Loss is {stop}')
 
         # Check if Account is Blocked
         if account.trading_blocked:
