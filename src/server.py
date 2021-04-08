@@ -23,10 +23,11 @@ consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
 def watchOrderFilledStatus(ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop):
+    time.sleep(10)
     order = get_order_by_client_order_id(order_id)
     count = 0
 
-    while order.status == 'accepted' or count < 2:
+    while order.status == 'accepted' and count < 2:
         order = get_order_by_client_order_id(order_id)
         api.cancel_order(order_id)
 
@@ -41,7 +42,7 @@ def watchOrderFilledStatus(ticker, qty, side, order_type, time_in_force, limit_p
 
             print(f'Buy Limit Price was changed from {limit_price} to {new_limit_price}')
             print(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
-        # Modify Buy Limit Price by -0.1%
+        # Modify Sell Limit Price by -0.1%
         elif side == 'sell':
             new_limit_price = limit_price * .999
 
@@ -53,6 +54,7 @@ def watchOrderFilledStatus(ticker, qty, side, order_type, time_in_force, limit_p
         order = submitOrder(api,ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop)
 
         time.sleep(10)
+        count ++
 
     if order.status == 'filled' :
         print (f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
