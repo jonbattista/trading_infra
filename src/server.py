@@ -58,11 +58,13 @@ def alpaca():
         price = json_data['price']
         side = json_data['side']
         if side == 'buy':
-            limit_price = round(float(price) * float('0.995'),2)
+             # Set Buy Limit Price higher by 0.005% to ensure it gets filled
+            limit_price = round(float(price) * float('1.005'),2)
             diff = round(abs(limit_price - price),2)
             print(f'Buying Limit Price is: ${price} - ${diff} = ${limit_price}')
         elif side == 'sell':
-            limit_price = round(abs(float(price) * float('1.005')),2)
+            # Set Sell Limit Price lower by 0.005% to ensure it gets filled
+            limit_price = round(abs(float(price) * float('.995')),2)
             diff = round(abs(limit_price - price),2)
             print(f'Selling Limit Price is: ${price} + ${diff} = ${limit_price}')
 
