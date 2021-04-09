@@ -193,12 +193,12 @@ def alpaca():
     APCA_API_SECRET_KEY = request.args.get('APCA_API_SECRET_KEY')
     user = APCA_API_KEY_ID
 
-    print('\n\n')
-    print(f'User is {user}')
+    user = APCA_API_KEY_ID
 
+    print(f'\n\nOrder received for User: {user}')
     data = request.get_data()
 
-    print(f'Data: {data}')
+    #print(f'Data: {data}')
 
     if(request.data):
         try:
@@ -224,7 +224,7 @@ def alpaca():
         if side == 'buy':
             limit_price = round(float(price) * float('0.995'),2)
             diff = round(abs(limit_price - price),2)
-            print(f'Buying Limit Price is: ${price} + ${diff} = ${limit_price}')
+            print(f'Buying Limit Price is: ${price} - ${diff} = ${limit_price}')
         elif side == 'sell':
             limit_price = round(abs(float(price) * float('1.005')),2)
             diff = round(abs(limit_price - price),2)
@@ -271,10 +271,12 @@ def alpaca():
 
         # Get Stop Loss
         if 'stop' not in json_data:
+            stop = None
             print('Not using a Stop Loss!')
             stop = None
         else:
-            stop = json_data['stop'] - (stop * 0.01)
+            stop = int(json_data['stop']) * 0.01
+            print(f'Stop Loss is {stop}')
 
         # Prin Variables
         print(f'Ticker is {ticker}')
@@ -283,7 +285,6 @@ def alpaca():
         print(f'Time-In-Force is {time_in_force}')
         print(f'Order Type is {order_type}')
         print(f'Quantity is {qty}')
-        print(f'Stop Loss is {stop}')
 
         # Check if Account is Blocked
         if account.trading_blocked:
@@ -301,12 +302,62 @@ def alpaca():
 
         # Get Positions
         portfolio = api.list_positions()
-
+        position = next((position for position in portfolio if position.symbol == ticker), None)
+        open_orders = api.list_orders(
+            status='open',
+            limit=10,
+        )
         # Check if there is already a Position for Ticker
-        if ticker in portfolio:
-            print(f'Error: User: {user} - You already have an Open Position in {ticker}')
-            return f'Error: You already have an Open Position in {ticker}', 500
+        if position is not None and side == 'buy':
+            print(f'Error: User: {user} - You already have an Open Position of {position.qty} shares in {ticker}')
+            return f'Error: You already have an Open Position of {position.qty} in {ticker} shares', 500
+        elif position is None and side == 'buy':
+            print(f'User: {user} - No position for {ticker} found.')
+        # Check if you are trying to sell something you dont have
+        elif position is None and side == 'sell':
+            print(f'Error: User: {user} - You have no position in {ticker} to Sell')
+            return f'Error: You have no position in {ticker} to Sell', 500
+        elif position is not None and side == 'sell':
+            print(f'User: {user} - You have {position.qty} of {ticker} to Sell')
 
+        open_order_qty = 0
+        open_order_ticker_count = 0
+        for open_order in open_orders:
+            if  open_order.symbol == ticker:
+                open_order_qty += int(open_order.qty)
+                open_order_ticker_count += 1
+
+        #open_order = next((open_order for open_order in open_orders if open_order.symbol == ticker), None)
+        #print(open_order_qty)
+        #print(position)
+        #print(int(position.qty))
+        #print(f'position qty is less than or equal to order qty: {int(position.qty) <= qty}')
+        #print(f'position qty is greater than order qty: {int(position.qty) > qty}')
+        #print(f'open order qty minus order qty is less than or equal to 0: {int(open_order_qty) - qty <= 0}')
+        #print(f'open order qty minus order qty is greater than 0: {int(open_order_qty) - qty > 0}')
+
+        if position is not None and int(position.qty) == open_order_qty and side == 'sell':
+            print(f'Error: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
+            return f'Error: There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.', 500
+        elif position is not None and int(position.qty) <= qty:
+            if int(open_order_qty) - qty == 0 and side == 'sell':
+                print(f'Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}')
+                return f'Error: There is already an Open order to sell {open_order_qty} of {ticker}', 500
+            elif int(open_order_qty) - qty < 0 and side == 'sell':
+                print(f'Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}. You can only sell {abs(int(open_order_qty) - qty)}')
+                return f'Error: There is already an Open order to sell {open_order_qty} of {ticker}. You can only sell {abs(int(open_order_qty) - qty)}', 500
+            elif int(open_order_qty) - qty > 0 and side == 'sell':
+                print(f'Warning: User: {user} - You are selling {open_order_qty} of {ticker}, which would leave {int(open_order_qty) - qty} leftover.')
+        elif position is not None and int(position.qty) > qty:
+            if int(open_order_qty) - qty == 0 and side == 'sell':
+                print(f'Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}.')
+                return f'Error: There is already an Open order to sell {open_order_qty} of {ticker}.', 500
+            elif int(open_order_qty) - qty < 0 and side == 'sell':
+                print(f'Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}. You can only sell {abs(int(open_order_qty) - qty)}')
+                return f'Error: There is already an Open order to sell {open_order_qty} of {ticker}. You can only sell {abs(int(open_order_qty) - qty)}', 500
+            elif int(open_order_qty) - qty > 0 and side == 'sell':
+                print(f'Warning: User: {user} - You are selling {open_order_qty} of {ticker}, which would leave {abs(int(open_order_qty) - qty)} leftover.')
+        
         # Order Flow
         if buying_power > 0:
             print(f'buying power check {math.floor(buying_power // qty > 0)}')
@@ -314,6 +365,105 @@ def alpaca():
                 
                 order = submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop)
                 print(order_id)
+        if buying_power > 0 and side == 'buy':
+            if qty > 0 and math.floor(buying_power // qty) > 0:
+                # Submit Order with Stop Loss
+                if stop is not None:
+                    try:
+                        order = api.submit_order(
+                            symbol=ticker,
+                            qty=qty,
+                            side=side,
+                            type=order_type,
+                            time_in_force=time_in_force,
+                            limit_price=limit_price,
+                            client_order_id=order_id,
+                            order_class='oto',
+                            stop_loss={'stop_price': stop }
+                        )
+                    except tradeapi.rest.APIError as e:
+                        if e == 'account is not authorized to trade':
+                            print(f'Error: {e} - Check your API Keys exist')
+                            return f'Error: {e} - Check your API Keys exist', 500
+                        else:
+                            print(e)
+                            return f'{e}', 500
+                # Submit Order without Stop Loss
+                else:
+                    try:
+                        order = api.submit_order(
+                            symbol=ticker,
+                            qty=qty,
+                            side=side,
+                            type=order_type,
+                            time_in_force=time_in_force,
+                            limit_price=limit_price,
+                            client_order_id=order_id
+                        )
+                    except tradeapi.rest.APIError as e:
+                        if e == 'account is not authorized to trade':
+                            print(f'Error: {e} - Check your API Keys exist')
+                            return f'Error: {e} - Check your API Keys exist', 500
+                        else:
+                            print(e)
+                            return f'{e}', 500
+                print(order)
+                if order.status == 'accepted':
+                    print (f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+
+                    # Check that order if filled
+                    #watchOrderFilledStatus(order_id)
+
+                    return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
+                else:
+                    print(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+                    return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 500
+            else:
+                print(f'Error: User: {user} - Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}')
+                return f'Error: Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}', 500
+        elif int(position.qty) > 0 and side == 'sell':
+            if int(qty) <= int(position.qty):
+            # Submit Order with Stop Loss
+                if stop is not None:
+                    try:
+                        order = api.submit_order(
+                            symbol=ticker,
+                            qty=qty,
+                            side=side,
+                            type=order_type,
+                            time_in_force=time_in_force,
+                            limit_price=limit_price,
+                            client_order_id=order_id,
+                            order_class='oto',
+                            stop_loss={'stop_price': stop }
+                        )
+                    except tradeapi.rest.APIError as e:
+                        if e == 'account is not authorized to trade':
+                            print(f'Error: {e} - Check your API Keys exist')
+                            return f'Error: {e} - Check your API Keys exist', 500
+                        else:
+                            print(e)
+                            return f'{e}', 500
+                # Submit Order without Stop Loss
+                else:
+                    try:
+                        order = api.submit_order(
+                            symbol=ticker,
+                            qty=qty,
+                            side=side,
+                            type=order_type,
+                            time_in_force=time_in_force,
+                            limit_price=limit_price,
+                            client_order_id=order_id
+                        )
+                    except tradeapi.rest.APIError as e:
+                        if e == 'account is not authorized to trade':
+                            print(f'Error: {e} - Check your API Keys exist')
+                            return f'Error: {e} - Check your API Keys exist', 500
+                        else:
+                            print(e)
+                            return f'{e}', 500
+                print(order)
                 if order.status == 'accepted':
                     print (f'Pending: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
 
@@ -325,8 +475,8 @@ def alpaca():
                     return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 500
 
             else:
-                print(f'Error: User: {user} - Not enough Buying Power (${buying_power}) to buy {ticker} at limit price ${limit_price}')
-                return f'Error: Not enough Buying Power (${buying_power}) to buy {ticker} at limit price ${limit_price}', 500
+                print(f'Error: User: {user} - You cannot sell {qty} when you only have {position.qty}')
+                return f'Error: You cannot sell {qty} when you only have {position.qty}', 500
         print(f'Error: User: {user} - You have no Buying Power: ${buying_power}')
         return f'Error: You have no Buying Power: ${buying_power}', 500
     else:
