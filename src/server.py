@@ -142,6 +142,18 @@ def alpaca():
             status='open',
             limit=10,
         )
+        # Check if there is already a Position for Ticker
+        if position is not None and side == 'buy':
+            print(f'Error: User: {user} - You already have an Open Position of {position.qty} shares in {ticker}')
+            return f'Error: You already have an Open Position of {position.qty} in {ticker} shares', 500
+        elif position is None and side == 'buy':
+            print(f'User: {user} - No position for {ticker} found.')
+        # Check if you are trying to sell something you dont have
+        elif position is None and side == 'sell':
+            print(f'Error: User: {user} - You have no position in {ticker} to Sell')
+            return f'Error: You have no position in {ticker} to Sell', 500
+        elif position is not None and side == 'sell':
+            print(f'User: {user} - You have {position.qty} of {ticker} to Sell')
 
         open_order_qty = 0
         open_order_ticker_count = 0
@@ -180,20 +192,7 @@ def alpaca():
                 return f'Error: There is already an Open order to sell {open_order_qty} of {ticker}. You can only sell {abs(int(open_order_qty) - qty)}', 500
             elif int(open_order_qty) - qty > 0 and side == 'sell':
                 print(f'Warning: User: {user} - You are selling {open_order_qty} of {ticker}, which would leave {abs(int(open_order_qty) - qty)} leftover.')
-
-        # Check if there is already a Position for Ticker
-        if position is not None and side == 'buy':
-            print(f'Error: User: {user} - You already have an Open Position of {position.qty} shares in {ticker}')
-            return f'Error: You already have an Open Position of {position.qty} in {ticker} shares', 500
-        elif position is None and side == 'buy':
-            print(f'User: {user} - No position for {ticker} found.')
-        # Check if you are trying to sell something you dont have
-        elif position is None and side == 'sell':
-            print(f'Error: User: {user} - You have no position in {ticker} to Sell')
-            return f'Error: You have no position in {ticker} to Sell', 500
-        elif position is not None and side == 'sell':
-            print(f'User: {user} - You have {position.qty} of {ticker} to Sell')
-
+        
         # Order Flow
         if buying_power > 0 and side == 'buy':
             if qty > 0 and math.floor(buying_power // qty) > 0:
