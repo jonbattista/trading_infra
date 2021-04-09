@@ -160,7 +160,7 @@ def alpaca():
         print(f'open order qty minus order qty is less than or equal to 0: {int(open_order_qty) - qty <= 0}')
         print(f'open order qty minus order qty is greater than 0: {int(open_order_qty) - qty > 0}')
 
-        if int(position.qty) == open_order_qty:
+        if int(position.qty) == open_order_qty and side == 'sell':
             print(f'Error: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
             return f'Error: There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.', 500
         elif int(position.qty) <= qty:
