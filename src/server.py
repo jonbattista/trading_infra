@@ -61,12 +61,12 @@ def alpaca():
              # Set Buy Limit Price higher by 0.005% to ensure it gets filled
             limit_price = round(float(price) * float('1.005'),2)
             diff = round(abs(limit_price - price),2)
-            print(f'Buying Limit Price is: ${price} - ${diff} = ${limit_price}')
+            print(f'Buying Limit Price is: ${price} + ${diff} = ${limit_price}')
         elif side == 'sell':
             # Set Sell Limit Price lower by 0.005% to ensure it gets filled
             limit_price = round(abs(float(price) * float('.995')),2)
             diff = round(abs(limit_price - price),2)
-            print(f'Selling Limit Price is: ${price} + ${diff} = ${limit_price}')
+            print(f'Selling Limit Price is: ${price} - ${diff} = ${limit_price}')
 
         # Check if Live or Paper Trading
         if APCA_API_KEY_ID[0:2] == 'PK':
