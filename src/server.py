@@ -31,10 +31,10 @@ def alpaca():
 
     user = APCA_API_KEY_ID
 
-    print(f'\n\nUser is {user}')
+    print(f'\n\nOrder received for User: {user}')
     data = request.get_data()
 
-    print(f'Data: {data}')
+    #print(f'Data: {data}')
 
     if(request.data):
         try:
@@ -60,7 +60,7 @@ def alpaca():
         if side == 'buy':
             limit_price = round(float(price) * float('0.995'),2)
             diff = round(abs(limit_price - price),2)
-            print(f'Buying Limit Price is: ${price} + ${diff} = ${limit_price}')
+            print(f'Buying Limit Price is: ${price} - ${diff} = ${limit_price}')
         elif side == 'sell':
             limit_price = round(abs(float(price) * float('1.005')),2)
             diff = round(abs(limit_price - price),2)
@@ -147,18 +147,17 @@ def alpaca():
         open_order_ticker_count = 0
         for open_order in open_orders:
             if  open_order.symbol == ticker:
-                print(f'Adding {open_order.qty} to {open_order_qty}')
                 open_order_qty += int(open_order.qty)
                 open_order_ticker_count += 1
 
         #open_order = next((open_order for open_order in open_orders if open_order.symbol == ticker), None)
-        print(open_order_qty)
-        print(position)
-        print(int(position.qty))
-        print(f'position qty is less than or equal to order qty: {int(position.qty) <= qty}')
-        print(f'position qty is greater than order qty: {int(position.qty) > qty}')
-        print(f'open order qty minus order qty is less than or equal to 0: {int(open_order_qty) - qty <= 0}')
-        print(f'open order qty minus order qty is greater than 0: {int(open_order_qty) - qty > 0}')
+        #print(open_order_qty)
+        #print(position)
+        #print(int(position.qty))
+        #print(f'position qty is less than or equal to order qty: {int(position.qty) <= qty}')
+        #print(f'position qty is greater than order qty: {int(position.qty) > qty}')
+        #print(f'open order qty minus order qty is less than or equal to 0: {int(open_order_qty) - qty <= 0}')
+        #print(f'open order qty minus order qty is greater than 0: {int(open_order_qty) - qty > 0}')
 
         if int(position.qty) == open_order_qty and side == 'sell':
             print(f'Error: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
@@ -184,8 +183,8 @@ def alpaca():
 
         # Check if there is already a Position for Ticker
         if position is not None and side == 'buy':
-            print(f'Error: User: {user} - You already have an Open Position of {position.qty} in {ticker}')
-            return f'Error: You already have an Open Position of {position.qty} in {ticker}', 500
+            print(f'Error: User: {user} - You already have an Open Position of {position.qty} shares in {ticker}')
+            return f'Error: You already have an Open Position of {position.qty} in {ticker} shares', 500
         elif position is None and side == 'buy':
             print(f'User: {user} - No position for {ticker} found.')
         # Check if you are trying to sell something you dont have
