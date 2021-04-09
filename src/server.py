@@ -184,8 +184,8 @@ def alpaca():
 
         # Check if there is already a Position for Ticker
         if position is not None and side == 'buy':
-            print(f'Error: User: {user} - You already have an Open Position in {ticker}')
-            return f'Error: You already have an Open Position in {ticker}', 500
+            print(f'Error: User: {user} - You already have an Open Position of {position.qty} in {ticker}')
+            return f'Error: You already have an Open Position of {position.qty} in {ticker}', 500
         elif position is None and side == 'buy':
             print(f'User: {user} - No position for {ticker} found.')
         # Check if you are trying to sell something you dont have
