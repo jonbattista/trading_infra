@@ -275,12 +275,15 @@ def alpaca():
         if side == 'buy':
              # Set Buy Limit Price higher to ensure it gets filled
             limit_price = round(float(price) * 1.005, 2)
-
-            stop_limit_price = round(limit_price * 1.0075, 2)
+            print(f'Updated Limit Price is {limit_price}')
 
             new_stop = round(stop * 1.0065, 2)
 
-            print(f'Stop Price is {new_stop}')
+            print(f'Updated Stop Price is {new_stop}')
+
+            stop_limit_price = round(stop * 1.0075, 2)
+            print(f'Updated Stop Limit Price is {stop_limit_price}')
+
 
             diff = round(abs(limit_price - price),2)
 
@@ -288,12 +291,14 @@ def alpaca():
         elif side == 'sell':
             # Set Sell Limit Price lower to ensure it gets filled
             limit_price = round(abs(float(price) * .995), 2)
-
-            stop_limit_price = round(limit_price * 1.0075, 2)
+            print(f'Updated Limit Price is {limit_price}')
 
             new_stop = round(stop * 1.005, 2)
 
-            print(f'Stop Price is {new_stop}')
+            print(f'Updated Stop Price is {new_stop}')
+
+            stop_limit_price = round(stop * 1.0075, 2)
+            print(f'Updated Stop Limit Price is {stop_limit_price}')
 
             diff = round(abs(limit_price - price),2)
 
@@ -307,9 +312,9 @@ def alpaca():
 
         # Check if there are any open orders
         if not open_orders:
-            print('No Open Orders found')
+            print('No Open Orders found.')
         else:
-            print(f'{len(open_orders)} Open Orders were found!')
+            print(f'{len(open_orders)} Open Orders were found.')
 
         # Generate Order ID
         client_order_id = str(uuid.uuid4())
@@ -317,9 +322,9 @@ def alpaca():
         # Get Positions
         portfolio = api.list_positions()
         if not portfolio:
-            print('No Positions were found!')
+            print('No Positions were found.')
         else:
-            print(f'{len(portfolio)} Positions were found!')
+            print(f'{len(portfolio)} Positions were found.')
 
         position = next((position for position in portfolio if position.symbol == ticker), None)
 
@@ -374,7 +379,7 @@ def alpaca():
                 # Submit Order with Stop Loss
 
                 order = submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, new_stop)
-
+                print(order)
                 if order.status == 'accepted':
                     print (f'Pending: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
 
@@ -396,12 +401,13 @@ def alpaca():
             # Submit Order with Stop Loss
                 
                 order = submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, new_stop)
-
+                print(order)
                 if order.status == 'accepted':
                     print (f'Pending: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
 
                     # Check that order if filled
                     status = watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
+                    
                     if not status.response.ok:
                         return status.response.content, 400
                 else:
