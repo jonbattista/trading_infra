@@ -246,7 +246,7 @@ def alpaca():
         # Get Order Type
         order_type_condition = 'type' not in json_data
         if order_type_condition:
-            order_type = 'stop_limit'
+            order_type = 'bracket'
         else:
             order_type = json_data['order_type']
 
@@ -385,7 +385,7 @@ def alpaca():
 
                     # Check that order if filled
                     status = watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
-                    
+                    print(status)
                     if not status.response.ok:
                         return status.response.content, 400
 
@@ -407,7 +407,7 @@ def alpaca():
 
                     # Check that order if filled
                     status = watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
-                    
+                    print(status)
                     if not status.response.ok:
                         return status.response.content, 400
                 else:
