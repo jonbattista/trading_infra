@@ -357,6 +357,11 @@ def alpaca():
         #print(f'open order qty minus order qty is less than or equal to 0: {int(open_order_qty) - qty <= 0}')
         #print(f'open order qty minus order qty is greater than 0: {int(open_order_qty) - qty > 0}')
 
+        if side == 'sell':
+            for open_order in open_orders:
+                if  open_order.symbol == ticker and open_order.side == 'sell':
+                    api.cancel_order(order_id=open_order.id)
+
         if position is not None and int(position.qty) == open_order_qty and side == 'sell':
             print(f'Error: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
             return f'Error: There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.', 400
@@ -400,10 +405,6 @@ def alpaca():
                 return f'Error: Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}', 400
         elif int(position.qty) > 0 and side == 'sell':
             if int(qty) <= int(position.qty):
-
-                for open_order in open_orders:
-                    if  open_order.symbol == ticker and open_order.side == 'sell':
-                        api.cancel_order(order_id=open_order.id)
 
                 order = submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, new_stop)
                 #print(order)
