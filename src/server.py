@@ -162,7 +162,7 @@ def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, 
             print(e)
             return f'{e}', 500
     print(client_order_id)
-    print(order)
+    #print(order)
     return order
 
 app = Flask(__name__)
@@ -256,13 +256,6 @@ def alpaca():
         else:
             qty = json_data['qty']
 
-        # Get Stop Loss
-        if 'stop' not in json_data:
-            stop = None
-            print(f'Error: User: No Stop Loss was given. Stop Loss is required.')
-            return f'Error: No Stop Loss was given. Stop Loss is required.', 400
-        else:
-            stop = int(json_data['stop']) 
 
         # Prin Variables
         print(f'Ticker is {ticker}')
@@ -271,6 +264,14 @@ def alpaca():
         print(f'Time-In-Force is {time_in_force}')
         print(f'Order Type is {order_type}')
         print(f'Quantity is {qty}')
+
+        # Get Stop Loss
+        if 'stop' not in json_data:
+            stop = None
+            print(f'Error: User: No Stop Loss was given. Stop Loss is required.')
+            return f'Error: No Stop Loss was given. Stop Loss is required.', 400
+        else:
+            stop = int(json_data['stop']) 
 
         if side == 'buy':
              # Set Buy Limit Price higher to ensure it gets filled
@@ -382,13 +383,13 @@ def alpaca():
                 # Submit Order with Stop Loss
 
                 order = submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, new_stop)
-                print(order)
+                #print(order)
                 if order.status == 'accepted':
                     print (f'Pending: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
 
                     # Check that order if filled
                     status = watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
-                    print(status)
+                    #print(status)
 
                     return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
                 else:
@@ -399,16 +400,19 @@ def alpaca():
                 return f'Error: Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}', 400
         elif int(position.qty) > 0 and side == 'sell':
             if int(qty) <= int(position.qty):
-            # Submit Order with Stop Loss
-                
+
+                for open_order in open_orders:
+                    if  open_order.symbol == ticker:
+                        api.cancel_order(order_id=open_order.id)
+
                 order = submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, new_stop)
-                print(order)
+                #print(order)
                 if order.status == 'accepted':
                     print (f'Pending: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
 
                     # Check that order if filled
                     status = watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
-                    print(status)
+                    #print(status)
 
                     return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
                 else:
