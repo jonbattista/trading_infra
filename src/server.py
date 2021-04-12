@@ -275,14 +275,14 @@ def alpaca():
         if side == 'buy':
              # Set Buy Limit Price higher to ensure it gets filled
             limit_price = round(float(price) * 1.005, 2)
-            print(f'Updated Limit Price is {limit_price}')
+            print(f'Updated Limit Price is ${limit_price}')
 
-            new_stop = round(stop * 1.0065, 2)
+            new_stop = round(stop * 1.0075, 2)
 
-            print(f'Updated Stop Price is {new_stop}')
+            print(f'Updated Stop Price is ${new_stop}')
 
-            stop_limit_price = round(stop * 1.0075, 2)
-            print(f'Updated Stop Limit Price is {stop_limit_price}')
+            stop_limit_price = round(stop * 1.0065, 2)
+            print(f'Updated Stop Limit Price is ${stop_limit_price}')
 
 
             diff = round(abs(limit_price - price),2)
@@ -291,14 +291,14 @@ def alpaca():
         elif side == 'sell':
             # Set Sell Limit Price lower to ensure it gets filled
             limit_price = round(abs(float(price) * .995), 2)
-            print(f'Updated Limit Price is {limit_price}')
+            print(f'Updated Limit Price is ${limit_price}')
 
             new_stop = round(stop * 1.005, 2)
 
-            print(f'Updated Stop Price is {new_stop}')
+            print(f'Updated Stop Price is ${new_stop}')
 
             stop_limit_price = round(stop * 1.0075, 2)
-            print(f'Updated Stop Limit Price is {stop_limit_price}')
+            print(f'Updated Stop Limit Price is ${stop_limit_price}')
 
             diff = round(abs(limit_price - price),2)
 
