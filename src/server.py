@@ -136,33 +136,47 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
 def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, stop):
     # Submit Order with Stop Loss
     
-    print(f'Stop Price is {stop}')
-    try:
-        #new_limit_price = round(limit_price * 1.005, 2)
-
-        order = api.submit_order(
-            symbol=ticker,
-            qty=qty,
-            side=side,
-            type='limit',
-            limit_price=limit_price,
-            time_in_force=time_in_force,
-            client_order_id=client_order_id,
-            order_class='oto',
-            stop_loss=dict(
-                stop_price=stop,
-                limit_price=stop_limit_price
+    if stop is None and side == 'sell':
+        try:
+            order = api.submit_order(
+                symbol=ticker,
+                qty=qty,
+                side=side,
+                type='limit',
+                limit_price=limit_price,
+                time_in_force=time_in_force,
+                client_order_id=client_order_id,
             )
-        )
-    except tradeapi.rest.APIError as e:
-        if e == 'account is not authorized to trade':
-            print(f'Error: {e} - Check your API Keys are correct')
-            return f'Error: {e} - Check your API Keys correct', 500
-        else:
-            print(e)
-            return f'{e}', 500
-    print(client_order_id)
-    #print(order)
+        except tradeapi.rest.APIError as e:
+            if e == 'account is not authorized to trade':
+                print(f'Error: {e} - Check your API Keys are correct')
+                return f'Error: {e} - Check your API Keys correct', 500
+            else:
+                print(e)
+                return f'{e}', 500
+    else:
+        try:
+            order = api.submit_order(
+                symbol=ticker,
+                qty=qty,
+                side=side,
+                type='limit',
+                limit_price=limit_price,
+                time_in_force=time_in_force,
+                client_order_id=client_order_id,
+                order_class='oto',
+                stop_loss=dict(
+                    stop_price=stop,
+                    limit_price=stop_limit_price
+                )
+            )
+        except tradeapi.rest.APIError as e:
+            if e == 'account is not authorized to trade':
+                print(f'Error: {e} - Check your API Keys are correct')
+                return f'Error: {e} - Check your API Keys correct', 500
+            else:
+                print(e)
+                return f'{e}', 500
     return order
 
 app = Flask(__name__)
@@ -259,7 +273,7 @@ def alpaca():
 
         # Prin Variables
         print(f'Ticker is {ticker}')
-        print(f'Original Price is {price}')
+        print(f'Original Price is ${price}')
         print(f'Side is {side}')
         print(f'Time-In-Force is {time_in_force}')
         print(f'Order Type is {order_type}')
@@ -359,9 +373,17 @@ def alpaca():
 
         if side == 'sell':
             for open_order in open_orders:
-                print(order)
-                if  open_order.symbol == ticker and open_order.side == 'sell':
+                if open_order.symbol == ticker and open_order.side == 'sell':
+                    print(f'Canceling Sell Order ID: {open_order.id}')
                     api.cancel_order(order_id=open_order.id)
+                    time.sleep(3)
+            open_order_qty = 0
+            open_order_ticker_count = 0
+            open_orders = api.list_orders()
+            for open_order in open_orders:
+                if  open_order.symbol == ticker:
+                    open_order_qty += int(open_order.qty)
+                    open_order_ticker_count += 1
 
         if position is not None and int(position.qty) == open_order_qty and side == 'sell':
             print(f'Error: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
@@ -406,7 +428,8 @@ def alpaca():
                 return f'Error: Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}', 400
         elif int(position.qty) > 0 and side == 'sell':
             if int(qty) <= int(position.qty):
-
+                order_type = 'limit'
+                new_stop = None
                 order = submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, new_stop)
                 #print(order)
                 if order.status == 'accepted':
