@@ -402,7 +402,7 @@ def alpaca():
             if int(qty) <= int(position.qty):
 
                 for open_order in open_orders:
-                    if  open_order.symbol == ticker:
+                    if  open_order.symbol == ticker and open_order.side == 'sell':
                         api.cancel_order(order_id=open_order.id)
 
                 order = submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, new_stop)
