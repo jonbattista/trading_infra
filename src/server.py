@@ -127,10 +127,10 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
 
     if order.status == 'filled' :
         print (f'Success: User: {APCA_API_KEY_ID} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
-        return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
+        return order
     else:
         print(f'Error: User: {APCA_API_KEY_ID} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
-        return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 500
+        return order
     return 500
 
 def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, stop):
