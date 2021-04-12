@@ -359,6 +359,7 @@ def alpaca():
 
         if side == 'sell':
             for open_order in open_orders:
+                print(order)
                 if  open_order.symbol == ticker and open_order.side == 'sell':
                     api.cancel_order(order_id=open_order.id)
 
