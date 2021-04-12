@@ -374,7 +374,10 @@ def alpaca():
                 print(f'Warning: User: {user} - You are selling {open_order_qty} of {ticker}, which would leave {abs(int(open_order_qty) - qty)} leftover.')
         
         # Order Flow
-        if buying_power > 0 and side == 'buy':
+        if buying_power <= 0 and side == 'buy':
+            print(f'Error: User: {user} - You have no Buying Power: ${buying_power}')
+            return f'Error: You have no Buying Power: ${buying_power}', 400
+        elif buying_power > 0 and side == 'buy':
             if qty > 0 and math.floor(buying_power // qty) > 0:
                 # Submit Order with Stop Loss
 
@@ -413,8 +416,6 @@ def alpaca():
             else:
                 print(f'Error: User: {user} - You cannot sell {qty} when you only have {position.qty}')
                 return f'Error: You cannot sell {qty} when you only have {position.qty}', 400
-        print(f'Error: User: {user} - You have no Buying Power: ${buying_power}')
-        return f'Error: You have no Buying Power: ${buying_power}', 400
     else:
         print(f'Error: User {user} - Data Payload was empty!')
         return f'Error: User {user} - Data Payload was empty!', 400 
