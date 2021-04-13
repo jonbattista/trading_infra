@@ -275,12 +275,12 @@ def alpaca():
             #print(f'Updated Limit Price is ${limit_price}')
             limit_price = price
 
-            new_stop = round(stop * 1.005, 2)
+            #new_stop = round(stop * 1.005, 2)
 
-            print(f'Updated Stop Price is ${new_stop}')
+            #print(f'Updated Stop Price is ${new_stop}')
 
-            stop_limit_price = round(stop * 1.0075, 2)
-            print(f'Updated Stop Limit Price is ${stop_limit_price}')
+            #stop_limit_price = round(stop * 1.0075, 2)
+            #print(f'Updated Stop Limit Price is ${stop_limit_price}')
 
             diff = round(abs(limit_price - price),2)
 
