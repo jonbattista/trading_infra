@@ -99,7 +99,8 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
 def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, stop):
     # Submit Order with Stop Loss
     
-    if stop is None and side == 'sell':
+    # Need to make stop and stop_limit_price optional variable
+    if stop is None and stop_limit_price is None and side == 'sell':
         try:
             order = api.submit_order(
                 symbol=ticker,
@@ -275,11 +276,11 @@ def alpaca():
             #print(f'Updated Limit Price is ${limit_price}')
             limit_price = price
 
-            #new_stop = round(stop * 1.005, 2)
+            new_stop = None
 
             #print(f'Updated Stop Price is ${new_stop}')
 
-            #stop_limit_price = round(stop * 1.0075, 2)
+            stop_limit_price = None
             #print(f'Updated Stop Limit Price is ${stop_limit_price}')
 
             diff = round(abs(limit_price - price),2)
@@ -386,7 +387,7 @@ def alpaca():
                     status = watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
                     #print(status)
 
-                    return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
+                    return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {status}', 200
                 else:
                     print(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
                     return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 400
@@ -406,7 +407,7 @@ def alpaca():
                     status = watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
                     #print(status)
 
-                    return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {order.status}', 200
+                    return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {status}', 200
                 else:
                     print(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
                     return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 400
