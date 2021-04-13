@@ -39,7 +39,7 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
         if order is not None and side == 'buy':
             new_limit_price = round(float(order.limit_price) * 1.005, 2)
 
-            stop_limit_price = round(float(order.limit_price) * 1.0075, 2)
+            stop_limit_price = round(float(order.stop_price) * 1.0075, 2)
             new_stop = round(float(order.legs[0].stop_price) * 1.0065, 2)
 
             try:
@@ -84,11 +84,11 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
         count += 1
 
     if order.status == 'filled' :
-        print (f'Success: User: {APCA_API_KEY_ID} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+        print (f'User: {APCA_API_KEY_ID} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
         print(order)
         return order.status
     else:
-        print(f'Error: User: {APCA_API_KEY_ID} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+        print(f'User: {APCA_API_KEY_ID} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
         return order.status
     return 500
 
