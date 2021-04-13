@@ -234,7 +234,7 @@ def alpaca():
             return 'price is not set!', 400
         if json_data['side'] is None:
             return 'side is not set!', 400
-        elif json_data['side'] != 'buy' or json_data['side'] != 'sell':
+        if json_data['side'] != 'buy' or json_data['side'] != 'sell':
             return 'Side is malformed. Can only be Buy or Sell!', 400
 
         ticker = json_data['ticker']
