@@ -22,10 +22,6 @@ consoleHandler = logging.StreamHandler(stdout)
 consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
-#def closeAllPositions(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker) {
-#    api.api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker
-#}
-
 def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, stop):
     # Wait 20 seconds
     time.sleep(10)
@@ -34,7 +30,7 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
     order = api.get_order_by_client_order_id(client_order_id)
     count = 0
 
-    while order.status == 'accepted' or order.status == 'new' and count < 2:
+    while order.status == 'accepted' or order.status == 'new' and count < 1:
         print(f'Order Check Count is {count}')
 
         order = api.get_order_by_client_order_id(client_order_id)
@@ -65,7 +61,7 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
 
         # Modify Sell Limit Price
         elif order is not None and side == 'sell':
-            new_limit_price = round(float(order.limit_price) * .995, 2)
+            new_limit_price = round(float(order.limit_price) * .9925, 2)
 
             try:
 
