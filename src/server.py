@@ -92,24 +92,8 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
         # Modify Sell Limit Price
         elif order is not None and side == 'sell':
             new_limit_price = round(float(order.limit_price) * .995, 2)
-            stop_limit_price = round(float(order.limit_price) * 1.0075, 2)
-
-            new_stop = round(float(order.legs[0].stop_price) * .975, 2)
-            #data = {
-            #    'qty':qty,
-            #    'side': side,
-            #    'type': order_type,
-            #    'limit_price': new_limit_price,
-            #    'time_in_force': time_in_force,
-            #    'stop_loss': {
-            #        'limit_price': stop_limit_price,
-            #        'stop_price': new_stop
-            #    }
-            #}
 
             try:
-                #order = requests.patch(f'{url}/{order.id}', json=data, headers=headers)
-                #order.raise_for_status()
 
                 order = api.replace_order(
                     order_id=order.id,
