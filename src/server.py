@@ -234,12 +234,13 @@ def alpaca():
             return 'price is not set!', 400
         if json_data['side'] is None:
             return 'side is not set!', 400
-        if json_data['side'] != 'buy' or json_data['side'] != 'sell':
-            return 'Side is malformed. Can only be Buy or Sell!', 400
 
         ticker = json_data['ticker']
         price = json_data['price']
         side = json_data['side']
+        print(side)
+        #if str(side) is not 'buy' or str(side) is not 'sell':
+        #    return 'Side is malformed. Can only be Buy or Sell!', 400
 
         # Check if Live or Paper Trading
         if APCA_API_KEY_ID[0:2] == 'PK':
