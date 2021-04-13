@@ -89,6 +89,7 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
 
     if order.status == 'filled' :
         print (f'Success: User: {APCA_API_KEY_ID} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
+        print(order)
         return order.status
     else:
         print(f'Error: User: {APCA_API_KEY_ID} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
@@ -195,8 +196,8 @@ def alpaca():
         price = json_data['price']
         side = json_data['side']
         print(side)
-        #if str(side) is not 'buy' or str(side) is not 'sell':
-        #    return 'Side is malformed. Can only be Buy or Sell!', 400
+        if str(side) is not 'buy' or str(side) is not 'sell':
+            return f'Side is {side}. Can only be Buy or Sell!', 400
 
         # Check if Live or Paper Trading
         if APCA_API_KEY_ID[0:2] == 'PK':
