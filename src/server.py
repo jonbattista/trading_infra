@@ -37,19 +37,7 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
     while order.status == 'accepted' or order.status == 'new' and count < 2:
         print(f'Order Check Count is {count}')
 
-        #url = f'https://paper-api.alpaca.markets/v2/orders'
-#       #print(url)
-        #headers = {'APCA-API-KEY-ID':APCA_API_KEY_ID,'APCA-API-SECRET-KEY':APCA_API_SECRET_KEY}
-#       #print(headers)
-#       order = requests.get(f'{url}:by_client_order_id?client_order_id={client_order_id}', headers=headers)
-#       #print(order.content)
-#        #print(order_id)
         order = api.get_order_by_client_order_id(client_order_id)
-
-        #api.cancel_order(order_id)
-
-        # Generate new Order ID
-        #order_id = str(uuid.uuid4())
 
         # Modify Buy Limit Price
         if order is not None and side == 'buy':
@@ -57,28 +45,14 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
 
             stop_limit_price = round(float(order.limit_price) * 1.0075, 2)
             new_stop = round(float(order.legs[0].stop_price) * 1.0065, 2)
-            #data = {
-            #    'qty':qty,
-            #    'side': side,
-            #    'type': order_type,
-            #    'limit_price': new_limit_price,
-            #    'time_in_force': time_in_force,
-            #    'stop_loss': {
-            #        'limit_price': stop_limit_price,
-            #        'stop_price': new_stop
-            #    }
-            #}
 
             try:
-                #order = requests.patch(f'{url}/{order.id}', json=data, headers=headers)
-                #order.raise_for_status()
 
                 order = api.replace_order(
                     order_id=order.id,
                     qty=qty,
                     time_in_force=time_in_force,
-                    #stop_price=new_stop,
-                    limit_price=stop_limit_price
+                    limit_price=new_limit_price
                 )
             except tradeapi.rest.APIError as err:
                 print(err.response.content)
