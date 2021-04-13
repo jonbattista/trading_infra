@@ -39,8 +39,8 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
         if order is not None and side == 'buy':
             new_limit_price = round(float(order.limit_price) * 1.005, 2)
 
-            stop_limit_price = round(float(order.legs[0].stop_price) * 1.0075, 2)
-            new_stop = round(float(order.legs[0].stop_price) * 1.0065, 2)
+            stop_limit_price = round(float(order.legs[0].stop_price) * .9925, 2)
+            new_stop = round(float(order.legs[0].stop_price) * .9945, 2)
 
             try:
 
