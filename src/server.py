@@ -22,6 +22,10 @@ consoleHandler = logging.StreamHandler(stdout)
 consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
+def closeAllPositions(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker) {
+    api.api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker
+}
+
 def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, stop):
     # Wait 20 seconds
     time.sleep(2)
@@ -288,8 +292,9 @@ def alpaca():
 
         if side == 'buy':
              # Set Buy Limit Price higher to ensure it gets filled
-            limit_price = round(float(price) * 1.005, 2)
-            print(f'Updated Limit Price is ${limit_price}')
+            #limit_price = round(float(price) * 1.005, 2)
+            #print(f'Updated Limit Price is ${limit_price}')
+            limit_price = price
 
             new_stop = round(stop * 1.0075, 2)
 
@@ -304,9 +309,10 @@ def alpaca():
             print(f'Buying Limit Price is: ${price} + ${diff} = ${limit_price}')
         elif side == 'sell':
             # Set Sell Limit Price lower to ensure it gets filled
-            limit_price = round(abs(float(price) * .995), 2)
-            print(f'Updated Limit Price is ${limit_price}')
-
+            #limit_price = round(abs(float(price) * .995), 2)
+            #print(f'Updated Limit Price is ${limit_price}')
+            limit_price = price
+            
             new_stop = round(stop * 1.005, 2)
 
             print(f'Updated Stop Price is ${new_stop}')
