@@ -28,7 +28,7 @@ logger.addHandler(consoleHandler)
 
 def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, stop):
     # Wait 20 seconds
-    time.sleep(2)
+    time.sleep(10)
     
     print(f'Checking Status for Order: {client_order_id}')
     order = api.get_order_by_client_order_id(client_order_id)
@@ -52,7 +52,7 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
         #order_id = str(uuid.uuid4())
 
         # Modify Buy Limit Price
-        if side == 'buy':
+        if order is not None and side == 'buy':
             new_limit_price = round(float(order.limit_price) * 1.005, 2)
 
             stop_limit_price = round(float(order.limit_price) * 1.0075, 2)
@@ -90,7 +90,7 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
             print(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
 
         # Modify Sell Limit Price
-        elif side == 'sell':
+        elif order is not None and side == 'sell':
             new_limit_price = round(float(order.limit_price) * .995, 2)
             stop_limit_price = round(float(order.limit_price) * 1.0075, 2)
 
@@ -125,7 +125,8 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
             print(order)
             print(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
             print(f'Sell Stop Loss Price was changed from {stop} to {new_stop}')
-        
+        else:
+            print(f'Order is None!')
         time.sleep(10)
         count += 1
 
