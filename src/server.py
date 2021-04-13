@@ -99,8 +99,7 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
                     order_id=order.id,
                     qty=qty,
                     time_in_force=time_in_force,
-                    #stop_price=new_stop,
-                    limit_price=stop_limit_price
+                    limit_price=new_limit_price
                 )
             except tradeapi.rest.APIError as err:
                 print(err.response.content)
