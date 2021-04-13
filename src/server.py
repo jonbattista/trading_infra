@@ -283,7 +283,7 @@ def alpaca():
         if 'stop' not in json_data and side == 'buy':
             print(f'Error: User: No Stop Loss was given for Buy. Stop Loss is required.')
             return f'Error: No Stop Loss was given for Buy. Stop Loss is required.', 400
-        elif 'stop' in json_data and side == 'buy':
+        elif 'stop' in json_data:
             stop = int(json_data['stop'])
 
         if side == 'buy':
