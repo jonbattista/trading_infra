@@ -34,12 +34,12 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
         print(f'Order Check Count is {count}')
 
         order = api.get_order_by_client_order_id(client_order_id)
-
+        print(order)
         # Modify Buy Limit Price
         if order is not None and side == 'buy':
             new_limit_price = round(float(order.limit_price) * 1.005, 2)
 
-            stop_limit_price = round(float(order.stop_price) * 1.0075, 2)
+            stop_limit_price = round(float(order.legs[0].stop_price) * 1.0075, 2)
             new_stop = round(float(order.legs[0].stop_price) * 1.0065, 2)
 
             try:
