@@ -107,7 +107,6 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
 
             print(order)
             print(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
-            print(f'Sell Stop Loss Price was changed from {stop} to {new_stop}')
         else:
             print(f'Order is None!')
 
