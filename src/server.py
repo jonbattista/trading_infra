@@ -1,6 +1,7 @@
 # TODO
 # - Remove Stop from Sell Price calculation
 # - Add Discord Messages
+# Need to make stop and stop_limit_price optional variable
 
 from flask import Flask, request
 import requests
@@ -44,68 +45,67 @@ def sendDiscordMessage(message):
 
 def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, stop):
     # Wait 20 seconds
-    time.sleep(10)
+    time.sleep(15)
     
     print(f'Checking Status for Order: {client_order_id}')
     order = api.get_order_by_client_order_id(client_order_id)
     count = 0
 
-    while order.status == 'accepted' or order.status == 'new' and count < 1:
-        print(f'Order Check Count is {count}')
+    if order is not None:
+        while order.status == 'accepted' or order.status == 'new' and count < 1:
+            print(f'Order Check Count is {count}')
 
-        order = api.get_order_by_client_order_id(client_order_id)
-        
-        # Modify Buy Limit Price
-        if order is not None and side == 'buy':
-            new_limit_price = round(float(order.limit_price) * 1.005, 2)
+            # Modify Buy Limit Price
+            if side == 'buy':
+                new_limit_price = round(float(order.limit_price) * 1.005, 2)
 
-            stop_limit_price = round(float(order.legs[0].stop_price) * .9925, 2)
-            new_stop = round(float(order.legs[0].stop_price) * .9945, 2)
+                stop_limit_price = round(float(order.legs[0].stop_price) * .9925, 2)
+                new_stop = round(float(order.legs[0].stop_price) * .9945, 2)
 
-            try:
+                try:
 
-                order = api.replace_order(
-                    order_id=order.id,
-                    qty=qty,
-                    time_in_force=time_in_force,
-                    limit_price=new_limit_price
-                )
-                # Modify the stop loss
-                order = api.replace_order(
-                    order_id=order.id,
-                    qty=qty,
-                    time_in_force=time_in_force,
-                    limit_price=new_limit_price
-                )
-            except tradeapi.rest.APIError as err:
-                print(f'Error modifying buy order: {err.response.content}')
-                return err
-                
-            print(f'Buy Limit Price was changed from {limit_price} to {new_limit_price}')
-            print(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
+                    order = api.replace_order(
+                        order_id=order.id,
+                        qty=qty,
+                        time_in_force=time_in_force,
+                        limit_price=new_limit_price
+                    )
+                    # Modify the stop loss
+                    #order = api.replace_order(
+                        #order_id=order.id,
+                        #qty=qty,
+                        #time_in_force=time_in_force,
+                        #limit_price=new_limit_price
+                    #)
+                except tradeapi.rest.APIError as err:
+                    print(f'Error modifying buy order: {err.response.content}')
+                    return err
+                    
+                print(f'Buy Limit Price was changed from {limit_price} to {new_limit_price}')
+                print(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
 
-        # Modify Sell Limit Price
-        elif order is not None and side == 'sell':
-            new_limit_price = round(float(order.limit_price) * .9925, 2)
+            # Modify Sell Limit Price
+            elif side == 'sell':
+                new_limit_price = round(float(order.limit_price) * .9925, 2)
 
-            try:
+                try:
 
-                order = api.replace_order(
-                    order_id=order.id,
-                    qty=qty,
-                    time_in_force=time_in_force,
-                    limit_price=new_limit_price
-                )
-            except tradeapi.rest.APIError as err:
-                print(f'Error modifying sell order: {err.response.content}')
-                return err
+                    order = api.replace_order(
+                        order_id=order.id,
+                        qty=qty,
+                        time_in_force=time_in_force,
+                        limit_price=new_limit_price
+                    )
+                except tradeapi.rest.APIError as err:
+                    print(f'Error modifying sell order: {err.response.content}')
+                    return err
 
-            print(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
-        else:
-            print(f'Order is None!')
+                print(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
+            else:
+                print(f'Order is None!')
 
-        time.sleep(10)
-        count += 1
+            time.sleep(10)
+            count += 1
 
     if order.status == 'filled' :
         print (f'User: {APCA_API_KEY_ID} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}')
@@ -119,7 +119,6 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
 def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, stop):
     # Submit Order with Stop Loss
     
-    # Need to make stop and stop_limit_price optional variable
     if stop is None and stop_limit_price is None and side == 'sell':
         try:
             order = api.submit_order(
@@ -375,8 +374,8 @@ def alpaca():
             print(f'No position for {ticker} found. Proceeding...')
         # Check if you are trying to sell something you dont have
         elif position is None and side == 'sell':
-            print(f'Error: User {user} - You have no position in {ticker} to sell. Aborting.')
-            sendDiscordMessage(f'Error: User {user} - You have no position in {ticker} to sell. Aborting.')
+            print(f'Error: User {user} - You have no position in {ticker} to sell.')
+            sendDiscordMessage(f'Error: User {user} - You have no position in {ticker} to sell.')
             return f'Error: You have no position in {ticker} to sell.', 400
         elif position is not None and side == 'sell':
             print(f'User {user} - Has {position.qty} shares of {ticker} to sell')
