@@ -28,10 +28,9 @@ consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
 def sendDiscordMessage(message):
-    url = "    https://discord.com/api/webhooks/831876009862496317/5i2sX8pUiDRZ3MqjFsIvGSJty0imhh0o19gYiA78C0GpdmQ5F24UWfarKxttzd8egVdL"
+    url = "https://discord.com/api/webhooks/831890918796820510/OWR1HucrnJzHdTE-vASdf5EIbPC1axPikD4D5lh0VBn413nARUW4mla3xPjZHWCK9-9P"
     webhook = Webhook.from_url(url, adapter=RequestsWebhookAdapter())
     webhook.send(message)
-
 
 def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, stop):
     # Wait 20 seconds
@@ -216,24 +215,26 @@ def alpaca():
             return f'Error parsing JSON: {e}', 400
 
         if json_data['ticker'] is None:
-            print(f'Error: User: - {user} Ticker parameter is not set!')
-            sendDiscordMessage(f'`Error: User: - {user} Ticker parameter is not set!`')
+            print(f'Error: User: {user} - Ticker parameter is not set!')
+            sendDiscordMessage(f'`Error: User: {user} - Ticker parameter is not set!`')
             return 'Error: Ticker parameter is not set!', 400
         if json_data['price'] is None:
-            print(f'Error: User: - {user} Price parameter is not set!')
-            sendDiscordMessage(f'`Error: User: - {user} Price parameter is not set!`')
+            print(f'Error: User: {user} - Price parameter is not set!')
+            sendDiscordMessage(f'`Error: User: {user} - Price parameter is not set!`')
             return 'Error: Price parameter is not set!', 400
         if json_data['side'] is None:
-            print(f'Error: User: - {user} Side parameter is not set!')
-            sendDiscordMessage(f'`Error: User: - {user} Side parameter is not set!`')
+            print(f'Error: User: {user} - Side parameter is not set!')
+            sendDiscordMessage(f'`Error: User: {user} - Side parameter is not set!`')
             return 'Error: Side parameter is not set!', 400
 
         ticker = json_data['ticker']
         price = json_data['price']
         side = json_data['side']
-        print(side)
-        #if str(side) is not 'buy' or str(side) is not 'sell':
-        #    return f'Side is {side}. Can only be Buy or Sell!', 400
+
+        if side.strip() != 'buy' and side.strip() != 'sell':
+            print(f'Error: User: {user} - Side is {side}. Can only be Buy or Sell!')
+            sendDiscordMessage(f'`Error: User: {user} - Side is {side}. Can only be Buy or Sell!`')
+            return f'Side is {side}. Can only be buy or sell!', 400
 
         # Check if Live or Paper Trading
         if APCA_API_KEY_ID[0:2] == 'PK':
@@ -296,27 +297,26 @@ def alpaca():
             #limit_price = round(float(price) * 1.005, 2)
             #print(f'Updated Limit Price is ${limit_price}')
             limit_price = price * base_limit_price_mulitplier
+            diff = round(abs(limit_price - price),2)
 
-            print(f'Original Stop Price is {stop}')
+            print(f'Buying Limit Price is: ${price} + ${diff} = ${limit_price}')
+
+            print(f'Original Stop Price is ${stop}')
             new_stop = round(stop * base_stop_price_multiplier, 2)
 
             # Make sure Limit Price is greater than Stop Price
             if limit_price - new_stop < 0:
-                new_stop = new_stop * base_stop_price_minimum_multiplier
+                new_stop = round(new_stop * base_stop_price_minimum_multiplier, 2)
 
             print(f'Updated Stop Price is ${new_stop}')
 
             stop_limit_price = round(stop * base_stop_limit_price_multiplier, 2)
 
             if new_stop - stop_limit_price < 0:
-                stop_limit_price = stop_limit_price * .999
+                stop_limit_price = round(stop_limit_price * .999, 2)
 
             print(f'Setting Stop Limit Price to ${stop_limit_price}')
 
-
-            diff = round(abs(limit_price - price),2)
-
-            print(f'Buying Limit Price is: ${price} + ${diff} = ${limit_price}')
         elif side == 'sell':
             # Set Sell Limit Price lower to ensure it gets filled
             #limit_price = round(abs(float(price) * .995), 2)
