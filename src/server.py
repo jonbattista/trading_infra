@@ -30,7 +30,17 @@ logger.addHandler(consoleHandler)
 def sendDiscordMessage(message):
     url = "https://discord.com/api/webhooks/831890918796820510/OWR1HucrnJzHdTE-vASdf5EIbPC1axPikD4D5lh0VBn413nARUW4mla3xPjZHWCK9-9P"
     webhook = Webhook.from_url(url, adapter=RequestsWebhookAdapter())
-    webhook.send(message)
+
+    if message is None:
+        return 'Error: Discord Message is empty!'
+    elif 'Error' in message:
+        msg = f'```diff\n-{message}\n```'
+        webhook.send(msg)
+    elif 'Success' in message:
+        msg = f'```diff\n+{message}\n```'
+        webhook.send(msg)
+    else:
+        webhook.send(message)
 
 def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, stop):
     # Wait 20 seconds
@@ -170,7 +180,7 @@ def alpaca():
 #    if request.args.get('token') != "XcYrXRtFXaNjTFXTFtQDMbsrmnmwygvuTa":
 #        return 'Unauthorized', 401
 
-    
+
     base_limit_price_mulitplier = 1
 
     base_stop_price_multiplier = .9925
@@ -189,11 +199,11 @@ def alpaca():
 
     if request.args.get('APCA_API_KEY_ID') is None:
         print(f'Error: APCA_API_KEY_ID is not set!')
-        sendDiscordMessage(f'``Error: APCA_API_KEY_ID is not set!`')
+        sendDiscordMessage(f'Error: APCA_API_KEY_ID is not set!')
         return 'APCA_API_KEY_ID is not set!', 400
     if request.args.get('APCA_API_SECRET_KEY') is None:
         print(f'Error: APCA_API_SECRET_KEY is not set!')
-        sendDiscordMessage(f'``Error: APCA_API_SECRET_KEY is not set!`')
+        sendDiscordMessage(f'Error: APCA_API_SECRET_KEY is not set!')
         return 'APCA_API_SECRET_KEY is not set!', 400
 
     APCA_API_KEY_ID = request.args.get('APCA_API_KEY_ID')
@@ -211,20 +221,20 @@ def alpaca():
             json_data = json.loads(data)
         except json.decoder.JSONDecodeError as e:
             print(f'Error parsing JSON body for User {user}: {e}')
-            sendDiscordMessage(f'`Error parsing JSON body for User {user}: {e}`')
+            sendDiscordMessage(f'Error parsing JSON body for User {user}: {e}')
             return f'Error parsing JSON: {e}', 400
 
         if json_data['ticker'] is None:
             print(f'Error: User: {user} - Ticker parameter is not set!')
-            sendDiscordMessage(f'`Error: User: {user} - Ticker parameter is not set!`')
+            sendDiscordMessage(f'Error: User: {user} - Ticker parameter is not set!')
             return 'Error: Ticker parameter is not set!', 400
         if json_data['price'] is None:
             print(f'Error: User: {user} - Price parameter is not set!')
-            sendDiscordMessage(f'`Error: User: {user} - Price parameter is not set!`')
+            sendDiscordMessage(f'Error: User: {user} - Price parameter is not set!')
             return 'Error: Price parameter is not set!', 400
         if json_data['side'] is None:
             print(f'Error: User: {user} - Side parameter is not set!')
-            sendDiscordMessage(f'`Error: User: {user} - Side parameter is not set!`')
+            sendDiscordMessage(f'Error: User: {user} - Side parameter is not set!')
             return 'Error: Side parameter is not set!', 400
 
         ticker = json_data['ticker']
@@ -233,7 +243,7 @@ def alpaca():
 
         if side.strip() != 'buy' and side.strip() != 'sell':
             print(f'Error: User: {user} - Side is {side}. Can only be Buy or Sell!')
-            sendDiscordMessage(f'`Error: User: {user} - Side is {side}. Can only be Buy or Sell!`')
+            sendDiscordMessage(f'Error: User: {user} - Side is {side}. Can only be Buy or Sell!')
             return f'Side is {side}. Can only be buy or sell!', 400
 
         # Check if Live or Paper Trading
@@ -245,7 +255,7 @@ def alpaca():
             print('Using Live Trading API')
         else:
             print(f'Error: API Key {APCA_API_KEY_ID} is malformed.')
-            sendDiscordMessage(f'`Error: API Key {APCA_API_KEY_ID} is malformed.`')
+            sendDiscordMessage(f'Error: API Key {APCA_API_KEY_ID} is malformed.')
             return 'Error: API Key {APCA_API_KEY_ID} is malformed.', 400
 
         # Get Account information
@@ -287,7 +297,7 @@ def alpaca():
         # Get Stop Loss
         if 'stop' not in json_data and side == 'buy':
             print(f'Error: User: {user} - No Stop Loss was given for Buy. Stop Loss is required.')
-            sendDiscordMessage(f'`User: {user} - No Stop Loss was given for Buy. Stop Loss is required.`')
+            sendDiscordMessage(f'Error: User: {user} - No Stop Loss was given for Buy. Stop Loss is required.')
             return f'Error: No Stop Loss was given for Buy. Stop Loss is required.', 400
         elif 'stop' in json_data:
             stop = int(json_data['stop'])
@@ -336,7 +346,7 @@ def alpaca():
 
         # Check if Account is Blocked
         if account.trading_blocked:
-            sendDiscordMessage(f'`Error: User: {user} - Account is currently restricted from trading.`')
+            sendDiscordMessage(f'Error: User: {user} - Account is currently restricted from trading.')
             return 'Account is currently restricted from trading.', 400
         
         open_orders = api.list_orders()
@@ -362,17 +372,17 @@ def alpaca():
         # Check if there is already a Position for Ticker
         if position is not None and side == 'buy':
             print(f'Error: User: {user} - You already have a Position of {position.qty} shares in {ticker}')
-            sendDiscordMessage(f'`Error: User: {user} - You already have a Position of {position.qty} shares in {ticker}`')
+            sendDiscordMessage(f'Error: User: {user} - You already have a Position of {position.qty} shares in {ticker}')
             return f'Error: You already have a Position of {position.qty} in {ticker} shares', 400
         elif position is None and side == 'buy':
             print(f'No position for {ticker} found. Proceeding...')
         # Check if you are trying to sell something you dont have
         elif position is None and side == 'sell':
-            print(f'Error: User {user} - You have no  position in {ticker} to Sell. Aborting.')
-            sendDiscordMessage(f'`User {user} - You have no  position in {ticker} to Sell. Aborting.`')
-            return f'Error: You have no position in {ticker} to Sell.', 400
+            print(f'Error: User {user} - You have no position in {ticker} to sell. Aborting.')
+            sendDiscordMessage(f'Error: User {user} - You have no position in {ticker} to sell. Aborting.')
+            return f'Error: You have no position in {ticker} to sell.', 400
         elif position is not None and side == 'sell':
-            print(f'You have {position.qty} shares of {ticker} to Sell')
+            print(f'User {user} - Has {position.qty} shares of {ticker} to sell')
 
         open_order_qty = 0
         open_order_ticker_count = 0
@@ -406,12 +416,12 @@ def alpaca():
 
         if position is not None and int(position.qty) == open_order_qty and side == 'sell':
             print(f'Error: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
-            sendDiscordMessage(f'`Error: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.`')
+            sendDiscordMessage(f'Error: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
             return f'Error: There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.', 400
         elif position is not None and int(position.qty) <= qty:
             if int(open_order_qty) - qty == 0 and side == 'sell':
                 print(f'Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}')
-                sendDiscordMessage(f'`Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}`')
+                sendDiscordMessage(f'Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}')
                 return f'Error: There is already an Open order to sell {open_order_qty} of {ticker}', 400
     
             elif int(open_order_qty) - qty > 0 and side == 'sell':
@@ -419,7 +429,7 @@ def alpaca():
         elif position is not None and int(position.qty) > qty:
             if int(open_order_qty) - qty == 0 and side == 'sell':
                 print(f'Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}.')
-                sendDiscordMessage(f'`Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}.`')
+                sendDiscordMessage(f'Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}.')
                 return f'Error: There is already an Open order to sell {open_order_qty} of {ticker}.', 400
             elif int(open_order_qty) - qty > 0 and side == 'sell':
                 print(f'Warning: User: {user} - You are selling {open_order_qty} of {ticker}, which would leave {abs(int(open_order_qty) - qty)} leftover.')
@@ -427,7 +437,7 @@ def alpaca():
         # Order Flow
         if buying_power <= 0 and side == 'buy':
             print(f'Error: User: {user} - You have no Buying Power: ${buying_power}')
-            sendDiscordMessage(f'`Error: User: {user} - You have no Buying Power: ${buying_power}`')
+            sendDiscordMessage(f'Error: User: {user} - You have no Buying Power: ${buying_power}')
             return f'Error: You have no Buying Power: ${buying_power}', 400
         elif buying_power > 0 and side == 'buy':
             if qty > 0 and math.floor(buying_power // qty) > 0:
@@ -441,15 +451,15 @@ def alpaca():
                     # Check that order if filled
                     status = watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
                     #print(status)
-                    sendDiscordMessage(f'`Success: User: {user} - Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {status}.`')
-                    return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {status}', 200
+                    sendDiscordMessage(f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {status}.')
+                    return f'Success: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {status}', 200
                 else:
                     print(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
-                    sendDiscordMessage(f'`Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.`')
+                    sendDiscordMessage(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
                     return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 400
             else:
                 print(f'Error: User: {user} - Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.')
-                sendDiscordMessage(f'`Error: User: {user} - Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.`')
+                sendDiscordMessage(f'Error: User: {user} - Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.')
                 return f'Error: Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.', 400
         elif int(position.qty) > 0 and side == 'sell':
             if int(qty) <= int(position.qty):
@@ -463,19 +473,19 @@ def alpaca():
                     # Check that order if filled
                     status = watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
                     #print(status)
-                    sendDiscordMessage(f'`Success: User: {user} - Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {status}.`')
-                    return f'Success: Order to {side} of {qty} shares of {ticker}  at ${limit_price} was {status}.', 200
+                    sendDiscordMessage(f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {status}.')
+                    return f'Success: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {status}.', 200
                 else:
                     print(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
-                    sendDiscordMessage(f'`Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.`')
+                    sendDiscordMessage(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
                     return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.', 400
             else:
                 print(f'Error: User: {user} - You cannot sell {qty} when you only have {position.qty}.')
-                sendDiscordMessage(f'`Error: User: {user} - You cannot sell {qty} when you only have {position.qty}.`')
+                sendDiscordMessage(f'Error: User: {user} - You cannot sell {qty} when you only have {position.qty}.')
                 return f'Error: You cannot sell {qty} when you only have {position.qty}', 400
     else:
         print(f'Error: User {user} - Data Payload was empty!')
-        sendDiscordMessage(f'`Error: User {user} - Data Payload was empty!`')
+        sendDiscordMessage(f'Error: User {user} - Data Payload was empty!')
         return f'Error: Data Payload was empty!', 400 
 
 if __name__ == '__main__':
