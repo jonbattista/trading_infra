@@ -54,7 +54,7 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
         print(f'Order Check Count is {count}')
 
         order = api.get_order_by_client_order_id(client_order_id)
-        #print(order)
+        
         # Modify Buy Limit Price
         if order is not None and side == 'buy':
             new_limit_price = round(float(order.limit_price) * 1.005, 2)
@@ -78,11 +78,9 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
                     limit_price=new_limit_price
                 )
             except tradeapi.rest.APIError as err:
-                print(err.response.content)
+                print(f'Error modifying buy order: {err.response.content}')
                 return err
                 
-            #print(order)
-
             print(f'Buy Limit Price was changed from {limit_price} to {new_limit_price}')
             print(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
 
@@ -99,10 +97,9 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
                     limit_price=new_limit_price
                 )
             except tradeapi.rest.APIError as err:
-                print(err.response.content)
+                print(f'Error modifying sell order: {err.response.content}')
                 return err
 
-            #print(order)
             print(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
         else:
             print(f'Order is None!')
