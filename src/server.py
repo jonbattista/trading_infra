@@ -50,9 +50,11 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
     print(f'Checking Status for Order: {client_order_id}')
     order = api.get_order_by_client_order_id(client_order_id)
     count = 0
+    print(f'Initial Order status is {order.status}')
 
     if order is not None:
         while order.status == 'accepted' or order.status == 'new' and count < 1:
+
             print(f'Order Check Count is {count}')
 
             # Modify Buy Limit Price
@@ -61,9 +63,9 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
 
                 stop_limit_price = round(float(order.legs[0].stop_price) * .9925, 2)
                 new_stop = round(float(order.legs[0].stop_price) * .9945, 2)
-
+                order = api.get_order_by_client_order_id(client_order_id)
+                print(f'Order status is {order.status}')
                 try:
-
                     order = api.replace_order(
                         order_id=order.id,
                         qty=qty,
@@ -104,6 +106,7 @@ def watchOrderFilledStatus(api, APCA_API_KEY_ID, APCA_API_SECRET_KEY, ticker, qt
             else:
                 print(f'Order is None!')
 
+            print(f'Order status is now {order.status}')
             time.sleep(10)
             count += 1
 
@@ -181,9 +184,9 @@ def alpaca():
 
     base_stop_price_multiplier = .9925
 
-    base_stop_limit_price_multiplier = .9935
+    base_stop_limit_price_multiplier = .99935
 
-    base_stop_price_minimum_multiplier = .999
+    base_stop_price_minimum_multiplier = .9999
 
     now = datetime.now()
     market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
@@ -316,12 +319,13 @@ def alpaca():
 
             print(f'Updated Stop Price is ${new_stop}')
 
-            stop_limit_price = round(stop * base_stop_limit_price_multiplier, 2)
+            stop_limit_price = round(new_stop * base_stop_limit_price_multiplier, 2)
+
+            print(f'Stop Limit Price is ${stop_limit_price}')
 
             if new_stop - stop_limit_price < 0:
                 stop_limit_price = round(stop_limit_price * .999, 2)
-
-            print(f'Setting Stop Limit Price to ${stop_limit_price}')
+                print(f'Modifiying Stop Limit Price to ${stop_limit_price}')
 
         elif side == 'sell':
             # Set Sell Limit Price lower to ensure it gets filled
@@ -362,6 +366,7 @@ def alpaca():
             print('No Positions were found.')
         else:
             print(f'{len(portfolio)} Positions were found.')
+            #print(portfolio)
 
         position = next((position for position in portfolio if position.symbol == ticker), None)
 
