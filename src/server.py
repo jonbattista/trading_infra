@@ -44,7 +44,7 @@ def sendDiscordMessage(message):
     webhook = Webhook.from_url(url, adapter=RequestsWebhookAdapter())
 
     if message is None:
-        print 'Error: Discord Message is empty!'
+        print('Error: Discord Message is empty!')
     elif 'Error' in message:
         msg = f'```diff\n-{message}\n```'
         webhook.send(msg)
