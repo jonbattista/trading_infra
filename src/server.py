@@ -30,7 +30,7 @@ logger.addHandler(consoleHandler)
 def marketIsOpen():
     now = datetime.now()
     market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
-    market_close = now.replace(hour=20, minute=0, second=0, microsecond=0)
+    market_closed = now.replace(hour=20, minute=0, second=0, microsecond=0)
 
     if now < market_open or now > market_closed:
         print(f"Market is Closed - {time.strftime('%l:%M %p')}")
