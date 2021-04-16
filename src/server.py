@@ -33,26 +33,33 @@ def marketIsOpen():
     market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
     market_closed = now.replace(hour=20, minute=0, second=0, microsecond=0)
 
-    if now < market_open or now > market_closed:
-        print(f"Market is Closed - {time.strftime('%l:%M %p')}")
-        return False
-    else:
-        print(f"Market is Open - {time.strftime('%l:%M %p')}")
-        return True
+    #if now < market_open or now > market_closed:
+#        print(f"Market is Closed - {time.strftime('%l:%M %p')}")
+#        return False
+#    else:
+#        print(f"Market is Open - {time.strftime('%l:%M %p')}")
+#        return True
+    return True
 
 def sendDiscordMessage(message):
     url = "https://discord.com/api/webhooks/831890918796820510/OWR1HucrnJzHdTE-vASdf5EIbPC1axPikD4D5lh0VBn413nARUW4mla3xPjZHWCK9-9P"
+    debug_url = "https://discord.com/api/webhooks/832603152330784819/yA1ZK7ymT3XBU0fJtg0cKZ9RNMPS0C9h0IDABmZZd_KIquToIODOSVOJ6k2aJQSrwC8I"
     webhook = Webhook.from_url(url, adapter=RequestsWebhookAdapter())
 
     if message is None:
         print('Error: Discord Message is empty!')
     elif 'Error' in message:
+        webhook = Webhook.from_url(debug_url, adapter=RequestsWebhookAdapter())
+        msg = f'```diff\n-{message}\n```'
+        webhook.send(msg)
+    elif 'Failed' in message:
         msg = f'```diff\n-{message}\n```'
         webhook.send(msg)
     elif 'Success' in message:
         msg = f'```diff\n+{message}\n```'
         webhook.send(msg)
     else:
+        webhook = Webhook.from_url(debug_url, adapter=RequestsWebhookAdapter())
         webhook.send(message)
 
 def checkOpenOrders(api, user, qty, side, ticker, position):
@@ -152,7 +159,7 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
     order = api.get_order_by_client_order_id(client_order_id)
 
     if order is not None:
-        count = 0
+        retry = 0
         order_id = order.id
         order_status = order.status
         print(f'Initial Order status is {order_status}')
@@ -161,10 +168,12 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
 
         if not marketIsOpen():
             return f"Market is Closed"
+        else:
+            marketOpen = marketIsOpen()
 
-        while order_status == 'accepted' or order_status == 'new' and order_status != 'partially_filled' and order_status != 'filled' and order_status != 'canceled' and order_status != 'done_for_day' and order_status != 'replaced' and order_status != 'pending_replace' and count < 5 and marketIsOpen():
+        while order_status == 'accepted' or order_status == 'new' and order_status != 'partially_filled' and order_status != 'filled' and order_status != 'canceled' and order_status != 'done_for_day' and order_status != 'replaced' and order_status != 'pending_replace' and retry < 5 and marketOpen:
             time.sleep(15)
-            print(f'Order Check Count is {count}')
+            print(f'Order Retry is {retry}')
 
             # Modify Buy Limit Price
             if side == 'buy':
@@ -179,8 +188,10 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
                 order = api.get_order(order_id)
                 order_id = order.id
                 order_status = order.status
-                print(f'Order status is {order_status}')
-                if order_status == 'filled' or order_status != 'partially_filled' or order_status != 'filled' or order_status != 'canceled' or order_status != 'done_for_day' or order_status != 'replaced' or order_status != 'pending_replace':
+                print(f'Buy Order status is {order_status}')
+
+                if order_status == 'filled' or order_status == 'partially_filled' or order_status == 'canceled' or order_status == 'done_for_day' or order_status == 'replaced' or order_status == 'pending_replace':
+                    print(f'Order Status is {order_status}. Breaking!')
                     break
 
                 try:
@@ -208,15 +219,17 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
                 limit_price = new_limit_price
                 print(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
                 stop = new_stop
-                print(f'Order status is now: {order_status}')
+                print(f'Buy Order status is: {order_status}')
             # Modify Sell Limit Price
             elif side == 'sell':
                 new_limit_price = round(float(order.limit_price) * .9925, 2)
                 order = api.get_order(order_id)
                 order_id = order.id
                 order_status = order.status
-                print(f'Order status is {order_status}')
-                if order_status == 'filled' or order_status != 'partially_filled' or order_status != 'filled' or order_status != 'canceled' or order_status != 'done_for_day' or order_status != 'replaced' or order_status != 'pending_replace':
+                print(f'Sell Order status is {order_status}')
+
+                if order_status == 'filled' or order_status == 'partially_filled' or order_status == 'canceled' or order_status == 'done_for_day' or order_status == 'replaced' or order_status == 'pending_replace':
+                    print(f'Order Status is {order_status}. Breaking!')
                     break
 
                 try:
@@ -235,21 +248,26 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
 
                 print(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
                 limit_price = new_limit_price
-                print(f'Order status is now: {order_status}')
+                print(f'Sell Order status is: {order_status}')
             else:
                 print(f'Order is None!')
 
+            marketOpen = marketIsOpen()
             time.sleep(10)
-            count += 1
-    
-        print(f'Last Order ID: {order_id}')
+            retry += 1
     
         order = api.get_order(order_id)
         order_id = order.id
         order_status = order.status
-        print(f'Order status is now: {order_status}')
+        print(f'Last Order ID: {order_id}')
+        print(f'Last Order status is: {order_status}')
 
-        return order_status
+    if retry >= 5:
+        return f'Error: Retry limit reached to {side} {qty} of {ticker}. Aborting.'
+    elif retry < 5 and order_status == 'filled' or order_status == 'partially_filled':
+        return f'Success: {order_status}'
+    elif retry < 5 and order_status == 'canceled' or order_status == 'done_for_day' or order_status == 'replaced' or order_status == 'pending_replace':
+        return f'Failed: {order_status}'
     else:
         print('Order was empty!')
         return None
@@ -325,9 +343,9 @@ def orderFlow(api, user, user_key, ticker, buying_power, qty, side, order_type, 
                     sendDiscordMessage(f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {status}.')
                     return f'Success: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {status}.', 200
                 else:
-                    print(f'Error: {status}')
-                    sendDiscordMessage(f'Error: {status}.')
-                    return f'Error: {status}.', 200
+                    print(status)
+                    sendDiscordMessage(status)
+                    return f'{status}', 200
             else:
                 print(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
                 sendDiscordMessage(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
@@ -353,9 +371,9 @@ def orderFlow(api, user, user_key, ticker, buying_power, qty, side, order_type, 
                     sendDiscordMessage(f'Success: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {status}.')
                     return f'Success: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {status}.', 200
                 else:
-                    print(f'Error: {status}')
-                    sendDiscordMessage(f'Error: {status}.')
-                    return f'Error: {status}.', 200
+                    print(status)
+                    sendDiscordMessage(status)
+                    return f'{status}', 200
             else:
                 print(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
                 sendDiscordMessage(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
@@ -558,7 +576,8 @@ def alpaca():
             # Generate Order ID
             inverse_client_order_id = str(uuid.uuid4())
             inverse_ticker = inverse_tickers.get(ticker).strip()
-            print(inverse_ticker)
+            print(f'Inverse Ticker is {inverse_ticker}')
+
             inverse_position = checkPositionExists(api, user, 'sell', inverse_ticker, True)
 
             # Check that inverse_position is not empty and is a tuple
