@@ -16,10 +16,50 @@ import plotly.graph_objs as go
 
 stock = 'btc-usd'  # input("Enter a Ticker: ")
 
-first_run = True
+avd = 0
+
 while avd == 0:
 
     data = yf.download(tickers=stock, period='5h', interval='1h')
+
+    # Strip the high/low data => create support, resistance
+
+
+    high = data.High
+    # print(high)
+
+    last3H0 = high.tail(3)  # last 3 including active candle [0]
+    last3H1 = high.tail(4).head(3)  # last 3 not including active [1]
+    # print(last3H1)
+
+    low = data.Low
+    # print(low)
+
+    low3H0 = low.tail(3)  # last 3 including active candle [0]
+    low3H1 = low.tail(4).head(3)  # last 3 not including active [1]
+    # print(low3H1)
+
+
+    res0 = max(last3H0)  # MAX of prior including active [0]
+    res1 = max(last3H1)
+
+    sup0 = min(low3H0)  # Min of prior including active [0]
+    sup1 = min(low3H1)
+
+    # live price
+    live = get_live_price(stock)
+
+    # AVD - Checks is live value is below or above prior candle
+    # support/resistance
+    if live > res1:
+        avd = 1
+    elif live < sup1:
+        avd = -1
+    else:
+        avd = 0
+
+
+data = yf.download(tickers=stock, period='5h', interval='1h')
 
 # Strip the high/low data => create support, resistance
 
@@ -58,17 +98,11 @@ else:
     avd = 0
 
 # AVN  - AVD value of last non-zero condition stored.
-
-    # fetch candles
-    # calculate avd
-if avd!=0 and not first_run:
+if avd!=0:
     avn=avd
     prior_avd = avd
 else:
     avn=prior_avd
-    first_run = False
-
-
 
 # TSL line
 if avn=1:
@@ -77,9 +111,9 @@ else:
     ts = res0
 
 #Buy/sell signal
-Buy = crossover(close, tsl) // and close > sma(close, 9)
+#Buy = crossover(close, tsl) // and close > sma(close, 9)
 
-Sell = crossunder(close, tsl)
+#Sell = crossunder(close, tsl)
 
 
 fig = go.Figure()
