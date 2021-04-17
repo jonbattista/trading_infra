@@ -1,3 +1,7 @@
+# Webhook requirements
+import requests
+import json
+
 # Raw package
 import pandas as pd
 
@@ -10,58 +14,73 @@ import plotly.graph_objs as go
 
 # Getting Live Market Data Intervals
 
-stock = input("Enter a Ticker: ")
+stock = 'btc-usd'  # input("Enter a Ticker: ")
 
-data = yf.download(tickers=stock, period='2d', interval='1h')
+first_run = True
+while avd == 0:
 
-# Strip the high/low data => create suport, resistance
+    data = yf.download(tickers=stock, period='5h', interval='1h')
+
+# Strip the high/low data => create support, resistance
+
+
 high = data.High
-last4H = high.tail(4)  # last 4 closes
-resistance1 = max(last4H.head(3))  # MAX of prior loop prior closes max
-print(high)
-print('resistance-1')
-print(resistance1)
+# print(high)
 
-resistance = max(high.tail(3))  # last 3 closes max
-print('resistance')
-print(resistance)
+last3H0 = high.tail(3)  # last 3 including active candle [0]
+last3H1 = high.tail(4).head(3)  # last 3 not including active [1]
+# print(last3H1)
 
 low = data.Low
-print(low)
-last3L = low.tail(4)  # last 4 closes
-support1 = min(last3L.head(3))  # Min of prior lop
-print('support-1')
-print(support1)
-support = min(low.tail(3))  # last 3 closes min
-print('support')
-print(support)
+# print(low)
+
+low3H0 = low.tail(3)  # last 3 including active candle [0]
+low3H1 = low.tail(4).head(3)  # last 3 not including active [1]
+# print(low3H1)
+
+
+res0 = max(last3H0)  # MAX of prior including active [0]
+res1 = max(last3H1)
+
+sup0 = min(low3H0)  # Min of prior including active [0]
+sup1 = min(low3H1)
 
 # live price
 live = get_live_price(stock)
-print(live)
 
-# AVD - Checks is live value is below or below prior candle
+# AVD - Checks is live value is below or above prior candle
 # support/resistance
-if live > resistance1:
-    AVD = 1
-elif live < support1:
-    AVD = -1
+if live > res1:
+    avd = 1
+elif live < sup1:
+    avd = -1
 else:
-    AVD = 0
-print(AVD)
+    avd = 0
 
 # AVN  - AVD value of last non-zero condition stored.
-def valuewhen(condition, source, occurrence):
-    return source \
-        .reindex(condition[condition].index) \
-        .shift(-occurrence) \
-        .reindex(source.index) \
-        .ffill()  # error in this functions!!#$%@#!~#@!@
+
+    # fetch candles
+    # calculate avd
+if avd!=0 and not first_run:
+    avn=avd
+    prior_avd = avd
+else:
+    avn=prior_avd
+    first_run = False
 
 
-AVN = valuewhen(AVD != 0, AVD, 0)
 
-# TSL line....TDB
+# TSL line
+if avn=1:
+    tsl = sup0
+else:
+    ts = res0
+
+#Buy/sell signal
+Buy = crossover(close, tsl) // and close > sma(close, 9)
+
+Sell = crossunder(close, tsl)
+
 
 fig = go.Figure()
 
@@ -88,4 +107,22 @@ fig.update_xaxes(
         dict(count=2, label="2h", step="hour", stepmode="backward"),
         dict(step="all")
     ))})
-fig.show()
+# fig.show()
+
+
+# Webhook OUT
+API_key = 'key here'
+API_password = 'pass here'
+webhook = 'https://trading.battista.dev/' \
+          '?APCA_API_KEY_ID=PKI8VO3NCM8G2NJ0SX0O&APCA_API_SECRET_KEY=LUyqGDO6hlKvezjnaMG4U1o7HJIQCUBZr2xcwaYQ'
+
+outdata = {
+    "qty": 5000,
+    "ticker": "ticker",
+    "price": "close",
+    "stop": "low",
+    "side": "buy"
+}
+
+r = requests.post(webhook, data=json.dumps(outdata))
+print(r)
