@@ -110,10 +110,13 @@ if avn=1:
 else:
     ts = res0
 
-#Buy/sell signal
-#Buy = crossover(close, tsl) // and close > sma(close, 9)
+#Buy/sell signal 
 
-#Sell = crossunder(close, tsl)
+close = data.Close.tail(2).head(1) #prior canlde close
+Buy = live > tsl and live > clsoe #Crossover of live price over tsl and higher than last candle close
+Sell = live < tsl and live < close #Crossunder of live price under tsl and lower than last candle close
+print(Buy)
+print(Sell)
 
 
 fig = go.Figure()
