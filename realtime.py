@@ -30,6 +30,12 @@ stock = 'btc-usd'  # input("Enter a Ticker: ")
 
 avd = -1
 
+date_list = []
+tsl_list = []
+old_data = dict{index=None,
+                High=None,
+                Low=None,
+                Close=None}
 #r = requests.post(webhook, data=json.dumps(outdata))
 
 app = dash.Dash(__name__)
@@ -39,7 +45,7 @@ app.layout = html.Div(
         dcc.Graph(id = 'candles', animate = True),
         dcc.Interval(
             id = 'update-candles',
-            interval = 60000,
+            interval = 1000,
             n_intervals = 0
             ),
     ]
@@ -65,7 +71,7 @@ def update_candles(n):
             )
         ])
 
-    data = yf.download(tickers=stock, period='48h', interval='1h')
+    data = yf.download(tickers=stock, period='30m', interval='1m')
     data = data.tz_convert('America/New_York')
 
     # Strip the high/low data => create support, resistance
@@ -91,6 +97,10 @@ def update_candles(n):
 
     sup0 = float(min(low3H0))  # Min of prior including active [0]
     sup1 = float(min(low3H1))
+    print(f'Resistance 0 is {res0}')
+    print(f'Resistance 1 is {res1}')
+    print(f'Support 0 is {sup0}')
+    print(f'Support 1 is {sup1}')
 
     # live price
     live = float(get_live_price(stock))
@@ -118,14 +128,17 @@ def update_candles(n):
     else:
         tsl = res0
 
+    print(f'AVD is {avd}')
+    print(f'AVN is {avn}')
+    print(f'TSL is {tsl}')
+    print(f'Last Price is {live}')
     #Buy/sell signal 
 
-    close_value = data.Close.tail(2).head(1).iloc[0]#prior canlde close
+    close_value = data.Close.tail(1).iloc[0]#prior canlde close
     close = float(close_value)
-    print(live)
-    print(tsl)
+    print(f'Close is {close}')
 
-    if float(live) > tsl and live > close:
+    if live > tsl and live > close:
         Buy = True  #Crossover of live price over tsl and higher than last candle close
     else:
         Buy = False
@@ -139,23 +152,40 @@ def update_candles(n):
     print(Buy)
     print(Sell)
 
-    now = datetime.now(timezone('US/Eastern'))
+    #Buy = True
+    if old_data != data:
+        # Candle stick
+        fig.add_trace(
+            go.Candlestick(x=data.index,
+                           open=data['Open'],
+                           high=data['High'],
+                           low=data['Low'],
+                           close=data['Close'], name='Market Data'))
+    else:
+        raise dash.exceptions.PreventUpdate()
 
-    Buy = True
+    now_utc = pytz.utc.localize(datetime.utcnow())
+    now_est = now_utc.astimezone(pytz.timezone("America/New_York"))
+    now_est = now_est.strftime('%Y-%m-%d %H:%M:%S%z')
+    #print(now_est)
+    date_list.append(now_est)
+    tsl_list.append(tsl)
+    #print(date_list)
+    #print(tsl_list)
 
-    # Candle stick
+    # Add TSL line
     fig.add_trace(
-        go.Candlestick(x=data.index,
-                       open=data['Open'],
-                       high=data['High'],
-                       low=data['Low'],
-                       close=data['Close'], name='Market Data'))
+        go.Scatter(
+            x=date_list,
+            y=tsl_list,
+            mode='lines'
+        ))
 
     if Buy:
-        fig.add_vline(x=now)
+        fig.add_vline(x=now_est)
 
     if Sell:
-        fig.add_vline(x=now)
+        fig.add_vline(x=now_est)
 
     # Add Titles
     fig.update_layout(
@@ -169,20 +199,12 @@ def update_candles(n):
         rangeselector={'buttons': list((
             #  dict(count=15, label="15min", step="minute", stepmode="backward"),
             # dict(count=45, label="45min", step="minute", stepmode="backward"),
+            dict(count=15, label="15m", step="minute", stepmode="backward"),
+            dict(count=30, label="30m", step="minute", stepmode="backward"),
             dict(count=1, label="1h", step="hour", stepmode="backward"),
             dict(count=2, label="2h", step="hour", stepmode="backward"),
             dict(step="all")
         ))})
-#    data = [ dict(
-#        type = 'candlestick',
-#        open = data['Open'],
-#        high = data['High'],
-#        low = data['Low'],
-#        close = data['Close'],
-#        x = data.index,
-#        yaxis = 'Price (USD/share)',
-#        name = 'Market Data',
-#    )]
 
     return fig
 
