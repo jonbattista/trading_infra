@@ -26,46 +26,40 @@ from dash.dependencies import Output, Input
 
 # Getting Live Market Data Intervals
 
-stock = 'btc-usd'  # input("Enter a Ticker: ")
+stock = 'qqq'  # input("Enter a Ticker: ")
 
 avd = -1
 
 date_list = []
 tsl_list = []
 
-candle_df = pd.DataFrame(columns = ['open',
-                        'high',
-                        'low',
-                        'close'],
-                        index = ['0'])
-
-def buildCandleDataFrame(value, candle_df):
-    # Set first received value to open
+def buildCandleDataFrame(value, data):
+    changed_data = data.copy()
     print(f'Value is {value}')
-    #print(candle_df)
-    #candle_df.loc['open'] = value
-    if pd.isnull(candle_df['open'].iloc[0]):
-        candle_df['open'].iloc[0] = value
+    length = len(changed_data.index) - 1
+    #print(f'Old: {data.iloc[length]}')
+    #print(f'Close Value is {init_close}')
+    low = round(changed_data['Low'].iloc[length], 2)
+    high = round(changed_data['High'].iloc[length], 2)
+    close = round(changed_data['Close'].iloc[length], 2)
 
     # Set the high value if it is greater than the open
-    if value > candle_df['open'].iloc[0] and pd.isnull(candle_df['high'].iloc[0]):
-        candle_df['high'].iloc[0] = value
+    if value > high:
+        print(f'Updating High Value from {high} to {value}')
+        changed_data['High'].iloc[length] = value
 
     # Set the low value if it is less than the open
-    if value < candle_df['open'].iloc[0] and pd.isnull(candle_df['low'].iloc[0]):
-        candle_df['low'].iloc[0] = value
-
-    # Update the high and low values 
-    if value > candle_df['high'].iloc[0]:
-        candle_df['high'].iloc[0] = value
-    elif value < candle_df['low'].iloc[0]:
-        candle_df['low'].iloc[0] = value
+    if value < low:
+        print(f'Updating Low Value from {low} to {value}')
+        changed_data['Low'].iloc[length] = value
 
     # After we have receieved any value, set close to current value
-    if not pd.isnull(candle_df['open'].iloc[0]):
-        candle_df['close'].iloc[0] = value
-
-    return candle_df
+    if value != close:
+        print(f'Updating Close Value from {close} to {value}')
+        changed_data['Close'].iloc[length] = value
+    
+    #print(f'New: {data.iloc[length]}')
+    return changed_data
 
 app = dash.Dash(__name__)
   
@@ -85,12 +79,15 @@ app.layout = html.Div(
     [Input('update-candles', 'n_intervals')]
 )
 def update_candles(n):
-    old_data = pd.DataFrame()
+    old_live = None
+    old_data = None
     fig = go.Figure()
-    data = yf.download(tickers=stock, period='30m', interval='1m', progress=False)
+    if 'data' not in locals():
+        data = yf.download(tickers=stock, period='5h', interval='1h', progress=False)
     data = data.tz_convert('America/New_York')
-
-
+    length = len(data.index) - 1
+    #print(f'Latest Data: {data.iloc[length]}')
+    #print(data)
     # Strip the high/low data => create support, resistance
 
 
@@ -120,21 +117,23 @@ def update_candles(n):
     # print(f'Support 1 is {sup1}')
 
     # live price
-    live = float(get_live_price(stock))
-    
-    live_candle = buildCandleDataFrame(live, candle_df)
-    print(f'Live Candle is:')
-    print(live_candle)
-    sec = time.localtime().tm_sec
-    print(f'Current Second is {sec}')
+    live = round(float(get_live_price(stock)), 2)
+#    if old_live != live:
+#        
+#        old_live = live
+    live_candle = buildCandleDataFrame(live, data)
+    #print(f'Live Candle is:')
+    #print(live_candle)
+    #sec = time.localtime().tm_sec
+    #print(f'Current Second is {sec}')
 
-    if sec == 59 or sec == 0:
-        old_data = data
-        candle_df['open'].iloc[0] = np.nan
-        candle_df['high'].iloc[0] = np.nan
-        candle_df['low'].iloc[0] = np.nan
-        candle_df['close'].iloc[0] = np.nan
-        print(candle_df)
+#    if sec == 59 or sec == 0:
+#        old_data = data
+#        data['open'].iloc[0] = np.nan
+#        data['high'].iloc[0] = np.nan
+#        data['low'].iloc[0] = np.nan
+#        data['close'].iloc[0] = np.nan
+#        print(candle_df)
 
     # AVD - Checks is live value is below or above prior candle
     # support/resistance
@@ -196,21 +195,22 @@ def update_candles(n):
 #    else:
 #        raise dash.exceptions.PreventUpdate()
     candlesticks = update_candlesticks(data, old_data)
+    #length = len(candlesticks.index)
     print(f'Candlesticks is {candlesticks}')
     fig.add_trace(candlesticks)
     #print(date_list)
     #print(tsl_list)
 
     # Add TSL line
-    fig.add_trace(
-        update_tsl(tsl, tsl_list, date_list)
-    )
+#    fig.add_trace(
+#        update_tsl(tsl, tsl_list, date_list)
+#    )
 
-    if Buy:
-        fig.add_vline(x=now_est)
+#    if Buy:
+#        fig.add_vline(x=now_est)#
 
-    if Sell:
-        fig.add_vline(x=now_est)
+#    if Sell:
+#        fig.add_vline(x=now_est)
 
     # Add Titles
     fig.update_layout(
@@ -236,25 +236,21 @@ def update_candles(n):
 def update_candlesticks(data, old_data):
     print(f'Current Data Close is {data.Close.tail(1).iloc[0]}')
     
-    if not old_data.empty:
-        print(f'Old Data is {old_data.Close.tail(1).iloc[0]}')
+    if not old_data is not None:
+        print(f'Old Data is {old_data}')
         #print(old_data['Open'].tail(1).iloc[0])
         #print(data['Open'].tail(1).iloc[0])
-        if old_data.Close.tail(1).iloc[0] != data.Close.tail(1).iloc[0]:
+        if old_data != data.Close.tail(1).iloc[0]:
 
             candlesticks = go.Candlestick(x=data.index,
                                open=data['Open'],
                                high=data['High'],
                                low=data['Low'],
                                close=data['Close'], name='Market Data')
+            old_data = data.Close.tail(1).iloc[0]
             return candlesticks
-        elif old_data.Close.tail(1).iloc[0] == data.Close.tail(1).iloc[0]:
-            candlesticks = go.Candlestick(x=data.index,
-                               open=data['Open'],
-                               high=data['High'],
-                               low=data['Low'],
-                               close=data['Close'], name='Market Data')
-            return candlesticks
+        else:
+            raise dash.exceptions.PreventUpdate()
     else:
         candlesticks = go.Candlestick(x=data.index,
                                open=data['Open'],
@@ -275,7 +271,7 @@ def update_tsl(tsl, tsl_list, date_list):
             y=tsl_list,
             mode='lines'
         )
-
+    #print(tsl)
     return tsl
 
 if __name__ == '__main__':
