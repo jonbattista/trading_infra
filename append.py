@@ -33,15 +33,15 @@ print(data)
 todays_date = datetime.datetime.now()
 index = pd.date_range(todays_date, periods=1, freq='D')
 
-df = pd.DataFrame(index=index) #how to add the candle data here?!
-df = df.fillna(1)
+input = {'Open':1, 'High':3,'Low':1,'Volume':15,'Close':1}
+df = pd.DataFrame(input, index=index)
 
 stamp = data.index.tolist()
 caca = stamp[len(stamp)-1]
 
 print(caca)
 
-removed = data.drop(pd.Timestamp(caca)) #how to get last date from index?S@!#@$%
+removed = data.drop(pd.Timestamp(caca))
 print(removed)
 
 df = removed.append(df)
