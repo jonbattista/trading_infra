@@ -20,13 +20,8 @@ import plotly.graph_objs as go
 
 stock = 'btc-usd'  # input("Enter a Ticker: ")
 
-first_run = True
-# while avd == 0:
-
-
 data = yf.download(tickers=stock, period='5h', interval='1h')
 data = data.tz_convert('America/New_York')
-
 
 print(data)
 
@@ -34,15 +29,13 @@ todays_date = datetime.datetime.now()
 index = pd.date_range(todays_date, periods=1, freq='D')
 
 input = {'Open':1, 'High':3,'Low':1,'Volume':15,'Close':1}
-df = pd.DataFrame(input, index=index)
+new_candle = pd.DataFrame(input, index=index)
 
 stamp = data.index.tolist()
-caca = stamp[len(stamp)-1]
+index_stamp = stamp[len(stamp)-1]
 
-print(caca)
-
-removed = data.drop(pd.Timestamp(caca))
+removed = data.drop(pd.Timestamp(index_stamp))
 print(removed)
 
-df = removed.append(df)
-print(df)
+new_data = removed.append(new_candle)
+print(new_data)
