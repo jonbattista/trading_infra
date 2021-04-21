@@ -27,31 +27,21 @@ first_run = True
 data = yf.download(tickers=stock, period='5h', interval='1h')
 data = data.tz_convert('America/New_York')
 
-item = data.High.tail(1)
-item2 = data.High.tail(0)
 
-data = data.copy()
-data1  = data.transpose()
-
-#print(data1)
-caca = data1.to_numpy().flatten()
-caca[6]=100
-#print(caca)
-
-new  = pd.DataFrame()
 print(data)
 
 todays_date = datetime.datetime.now()
-print(todays_date)
 index = pd.date_range(todays_date, periods=1, freq='D')
-
 
 df = pd.DataFrame(index=index) #how to add the candle data here?!
 df = df.fillna(1)
 
-stamp = type(data.index)
-print(stamp)
-removed = data.drop(pd.Timestamp('2021-04-20 22:00:00-4:00')) #how to get last date from index?S@!#@$%
+stamp = data.index.tolist()
+caca = stamp[len(stamp)-1]
+
+print(caca)
+
+removed = data.drop(pd.Timestamp(caca)) #how to get last date from index?S@!#@$%
 print(removed)
 
 df = removed.append(df)
