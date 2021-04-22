@@ -25,22 +25,24 @@ import inspect
 # Configure Logging for Docker container
 log = logging.getLogger('app')
 log.setLevel(logging.DEBUG)
-logFormatter = logging.Formatter("%(name)-12s %(asctime)s %(levelname)-8s %(filename)s:%(funcName)s %(message)s")
+#logFormatter = logging.Formatter("%(name)-12s %(asctime)s %(levelname)-8s %(filename)s:%(funcName)s %(message)s")
 consoleHandler = logging.StreamHandler(stdout)
-consoleHandler.setFormatter(logFormatter)
+#consoleHandler.setFormatter(logFormatter)
 log.addHandler(consoleHandler)
 
 def marketIsOpen():
     now = datetime.now()
-    market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
-    market_closed = now.replace(hour=20, minute=0, second=0, microsecond=0)
+    #market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
+    #market_closed = now.replace(hour=20, minute=0, second=0, microsecond=0)
+    market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+    market_closed = now.replace(hour=16, minute=0, second=0, microsecond=0)
 
-    #if now < market_open or now > market_closed:
-#        log.info(f"Market is Closed - {time.strftime('%l:%M %p')}")
-#        return False
-#    else:
-#        log.info(f"Market is Open - {time.strftime('%l:%M %p')}")
-#        return True
+    if now < market_open or now > market_closed:
+        log.info(f"Market is Closed - {time.strftime('%l:%M %p')}")
+        return False
+    else:
+        log.info(f"Market is Open - {time.strftime('%l:%M %p')}")
+        return True
     return True
 
 def sendDiscordMessage(message):
@@ -87,22 +89,20 @@ def checkOpenOrders(api, user, qty, side, ticker, position):
     #log.info(f'position qty is greater than order qty: {int(position.qty) > qty}')
     #log.info(f'open order qty minus order qty is less than or equal to 0: {int(open_order_qty) - qty <= 0}')
     #log.info(f'open order qty minus order qty is greater than 0: {int(open_order_qty) - qty > 0}')
-    if side == 'sell':
-        for open_order in open_orders:
-            if open_order.symbol == ticker and open_order.side == 'sell':
-                log.info(f'Canceling Sell {open_order.order_type} Order ID: {open_order.id}')
-                cancelled_order = api.cancel_order(order_id=open_order.id)
-                time.sleep(3)
-                log.info(cancelled_order)
-            else:
-                log.info(f'Open Order for {ticker} is a buy')
-        open_order_qty = 0
-        open_order_ticker_count = 0
-        open_orders = api.list_orders()
-        for open_order in open_orders:
-            if  open_order.symbol == ticker:
-                open_order_qty += int(open_order.qty)
-                open_order_ticker_count += 1
+    for open_order in open_orders:
+        if open_order.symbol == ticker:
+            log.info(f'Canceling {open_order.order_type} Order ID: {open_order.id}')
+            cancelled_order = api.cancel_order(order_id=open_order.id)
+            time.sleep(3)
+            log.info(cancelled_order)
+
+    open_order_qty = 0
+    open_order_ticker_count = 0
+    open_orders = api.list_orders()
+    for open_order in open_orders:
+        if  open_order.symbol == ticker:
+            open_order_qty += int(open_order.qty)
+            open_order_ticker_count += 1
 
     print(position)
     if position is not None and int(position.qty) == open_order_qty and side == 'sell':
@@ -170,7 +170,7 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
         log.info(f'Original Buy Order ID: {order_id}')
 
         if not marketIsOpen():
-            return f"Market is Closed"
+            raise Exception(f"Error: Order to {side} {qty} shares of {ticker} was submitted but cannot be filled - Market is Closed")
         else:
             marketOpen = marketIsOpen()
 
@@ -340,7 +340,11 @@ def orderFlow(api, user, user_key, ticker, position, buying_power, qty, side, or
                 log.info (f'Pending: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
 
                 # Check that order if filled
-                status = watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
+                try:
+                    status = watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
+                except Exception as e:
+                    sendDiscordMessage(str(e))
+                    return str(e), 500
                 #log.info(status)
                 if 'filled' in status or 'partially_filled' in status:
                     log.info (f'User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {status}')
@@ -370,7 +374,11 @@ def orderFlow(api, user, user_key, ticker, position, buying_power, qty, side, or
                 log.info (f'Pending: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
 
                 # Check that order if filled
-                status = watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
+                try:
+                    status = watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, new_stop)
+                except Exception as e:
+                    sendDiscordMessage(str(e))
+                    return str(e), 500
                 #log.info(status)
                 
                 if 'filled' in status or 'partially_filled' in status:
@@ -414,20 +422,9 @@ def alpaca():
 
 #    if request.args.get('token') != "XcYrXRtFXaNjTFXTFtQDMbsrmnmwygvuTa":
 #        return 'Unauthorized', 401
-
-    inverse_tickers = {
-        "TQQQ": "SQQQ",
-        "SQQQ": "TQQQ",
-        "SPXS": "SPXL", 
-        "SPXL": "SPXS",
-        "FNGD": "FNGU",
-        "FNGU": "FNGD",
-        "GUSH": "DRIP",
-        "DRIP": "GUSH"
-    }
     
-    if not marketIsOpen():
-        return f"Market is Closed - {time.strftime('%l:%M %p')}", 400
+    #if not marketIsOpen():
+    #    return f"Market is Closed - {time.strftime('%l:%M %p')}", 400
 
     base_limit_price_mulitplier = 1
 
@@ -465,6 +462,16 @@ def alpaca():
             log.error(f'Error: User: {user} - Ticker parameter is not set!')
             sendDiscordMessage(f'Error: User: {user} - Ticker parameter is not set!')
             return 'Error: Ticker parameter is not set!', 400
+
+        if 'inverse_ticker' not in json_data:
+            log.info(f'Info: User: {user} - Inverse Ticker parameter is not set! Using Normal Trading Mode')
+            inverse_mode = False
+            inverse_ticker = None
+        elif json_data['inverse_ticker'] is not None:
+            log.info(f'Info: User: {user} - Inverse Ticker parameter is set! Using Inverse Trading Mode')
+            inverse_mode = True
+            inverse_ticker = json_data['inverse_ticker']
+
         if json_data['price'] is None:
             log.error(f'Error: User: {user} - Price parameter is not set!')
             sendDiscordMessage(f'Error: User: {user} - Price parameter is not set!')
@@ -473,7 +480,7 @@ def alpaca():
             log.error(f'Error: User: {user} - Side parameter is not set!')
             sendDiscordMessage(f'Error: User: {user} - Side parameter is not set!')
             return 'Error: Side parameter is not set!', 400
-
+        
         ticker = json_data['ticker']
         price = json_data['price']
         side = json_data['side']
@@ -505,7 +512,7 @@ def alpaca():
         # Get Time-In-Force
         time_in_force_condition = 'time_in_force' not in json_data
         if time_in_force_condition:
-            time_in_force = 'day'
+            time_in_force = 'gtc'
         else:
             time_in_force = json_data['time_in_force']
 
@@ -525,6 +532,8 @@ def alpaca():
 
         # Print Variables
         log.info(f'Ticker is {ticker}')
+        log.info(f'Inverse Ticker is {inverse_ticker}')
+        log.info(f'Using Inverse Trading Mode? {inverse_mode}')
         log.info(f'Original Price is ${price}')
         log.info(f'Side is {side}')
         log.info(f'Time-In-Force is {time_in_force}')
@@ -587,11 +596,9 @@ def alpaca():
             sendDiscordMessage(f'Error: User: {user} - Account is currently restricted from trading.')
             return 'Account is currently restricted from trading.', 400
 
-        if ticker in inverse_tickers:
+        if inverse_mode:
             # Generate Order ID
             inverse_client_order_id = str(uuid.uuid4())
-            inverse_ticker = inverse_tickers.get(ticker).strip()
-            log.info(f'Inverse Ticker is {inverse_ticker}')
 
             if side == 'buy':
                 inverse_side = 'sell'
@@ -682,7 +689,7 @@ def alpaca():
             
             order_results = orderFlow(api, user, user_key, ticker, ticker_position, buying_power, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, new_stop)
             return order_results
-        return 'foo', 500
+        #return 'foo', 500
     return 'bar', 500
 
 if __name__ == '__main__':
