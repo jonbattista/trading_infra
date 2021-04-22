@@ -26,40 +26,59 @@ from dash.dependencies import Output, Input
 
 # Getting Live Market Data Intervals
 
-stock = 'qqq'  # input("Enter a Ticker: ")
+stock = 'btc-usd'  # input("Enter a Ticker: ")
 
 avd = -1
-
+count = None
 date_list = []
 tsl_list = []
-
+new_data = None
 def buildCandleDataFrame(value, data):
-    changed_data = data.copy()
-    print(f'Value is {value}')
-    length = len(changed_data.index) - 1
+    print(f'Live Value is {value}')
+    #print(data)
+    length = len(data.index) - 2
     #print(f'Old: {data.iloc[length]}')
     #print(f'Close Value is {init_close}')
-    low = round(changed_data['Low'].iloc[length], 2)
-    high = round(changed_data['High'].iloc[length], 2)
-    close = round(changed_data['Close'].iloc[length], 2)
+    print(data.iloc[-1])
+    open_value = round(data['Open'].iloc[-1], 2)
+    high_value = round(data['High'].iloc[-1], 2)
+    low_value = round(data['Low'].iloc[-1], 2)
+    close_value = round(data['Close'].iloc[-1], 2)
 
     # Set the high value if it is greater than the open
-    if value > high:
-        print(f'Updating High Value from {high} to {value}')
-        changed_data['High'].iloc[length] = value
+    if value > high_value:
+        print(f'Updating High Value from {high_value} to {value}')
+        high_value = value
 
     # Set the low value if it is less than the open
-    if value < low:
-        print(f'Updating Low Value from {low} to {value}')
-        changed_data['Low'].iloc[length] = value
+    if value < low_value:
+        print(f'Updating Low Value from {low_value} to {value}')
+        low_value = value
 
     # After we have receieved any value, set close to current value
-    if value != close:
-        print(f'Updating Close Value from {close} to {value}')
-        changed_data['Close'].iloc[length] = value
-    
+    if value != close_value:
+        print(f'Updating Close Value from {close_value} to {value}')
+        close_value = value
+
+    data.iloc[-1]=[open_value,high_value,low_value,close_value,0,0]
+    #print(data)
+#    todays_date = datetime.datetime.now()
+#    index = pd.date_range(todays_date, periods=1, freq='D')#
+
+#    input = {'Open':open,'High':high,'Low':low,'Volume':0,'Close':close}
+#    
+#    new_candle = pd.DataFrame(input, index=index)#
+
+#    stamp = data.index.tolist()
+#    index_stamp = stamp[len(stamp)-1]#
+
+#    removed = data.drop(pd.Timestamp(index_stamp))
+#    print(removed)#
+
+#    new_data = removed.append(new_candle)
+#    print(new_data)
     #print(f'New: {data.iloc[length]}')
-    return changed_data
+    return data
 
 app = dash.Dash(__name__)
   
@@ -79,13 +98,29 @@ app.layout = html.Div(
     [Input('update-candles', 'n_intervals')]
 )
 def update_candles(n):
-    old_live = None
+    global count
+    global new_data
     old_data = None
     fig = go.Figure()
-    if 'data' not in locals():
-        data = yf.download(tickers=stock, period='5h', interval='1h', progress=False)
-    data = data.tz_convert('America/New_York')
-    length = len(data.index) - 1
+    print(locals())
+    print(f'Count is {count}')
+    #print(f'New Data is {new_data}')
+    if count == 59 or count == None:
+        print('Fetching new data!')
+        new_data = yf.download(tickers=stock, period='5h', interval='1h', progress=False)
+        new_data = new_data.tz_convert('America/New_York')
+        count = 0
+    length = len(new_data.index) - 1
+    #print(f'New data is {new_data}')
+    print(new_data.iloc[-1])
+    starttime = time.time()
+    
+        
+    live = round(float(get_live_price(stock)), 2)
+    print(f'Last Data is {live}')
+    data = buildCandleDataFrame(live, new_data)
+    length = len(data.index) -1
+    
     #print(f'Latest Data: {data.iloc[length]}')
     #print(data)
     # Strip the high/low data => create support, resistance
@@ -117,11 +152,6 @@ def update_candles(n):
     # print(f'Support 1 is {sup1}')
 
     # live price
-    live = round(float(get_live_price(stock)), 2)
-#    if old_live != live:
-#        
-#        old_live = live
-    live_candle = buildCandleDataFrame(live, data)
     #print(f'Live Candle is:')
     #print(live_candle)
     #sec = time.localtime().tm_sec
@@ -195,13 +225,12 @@ def update_candles(n):
 #    else:
 #        raise dash.exceptions.PreventUpdate()
     candlesticks = update_candlesticks(data, old_data)
-    #length = len(candlesticks.index)
-    print(f'Candlesticks is {candlesticks}')
+    
     fig.add_trace(candlesticks)
     #print(date_list)
-    #print(tsl_list)
+#print(tsl_list)
 
-    # Add TSL line
+# Add TSL line
 #    fig.add_trace(
 #        update_tsl(tsl, tsl_list, date_list)
 #    )
@@ -230,14 +259,14 @@ def update_candles(n):
             dict(count=2, label="2h", step="hour", stepmode="backward"),
             dict(step="all")
         ))})
-
+    count += 1
     return fig
 
 def update_candlesticks(data, old_data):
-    print(f'Current Data Close is {data.Close.tail(1).iloc[0]}')
+    #print(f'Current Data Close is {data.Close.tail(1).iloc[0]}')
     
     if not old_data is not None:
-        print(f'Old Data is {old_data}')
+        #print(f'Old Data is {old_data}')
         #print(old_data['Open'].tail(1).iloc[0])
         #print(data['Open'].tail(1).iloc[0])
         if old_data != data.Close.tail(1).iloc[0]:
