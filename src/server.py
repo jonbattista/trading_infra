@@ -23,7 +23,7 @@ from discord import Webhook, RequestsWebhookAdapter
 import inspect
 
 # Configure Logging for Docker container
-log = logging.getLogger('app')
+log = logging.getLogger('traitor')
 log.setLevel(logging.DEBUG)
 #logFormatter = logging.Formatter("%(name)-12s %(asctime)s %(levelname)-8s %(filename)s:%(funcName)s %(message)s")
 consoleHandler = logging.StreamHandler(stdout)
@@ -32,16 +32,16 @@ log.addHandler(consoleHandler)
 
 def marketIsOpen():
     now = datetime.now()
-    market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
-    market_closed = now.replace(hour=20, minute=0, second=0, microsecond=0)
-    #market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
-    #market_closed = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    #market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
+    #market_closed = now.replace(hour=20, minute=0, second=0, microsecond=0)
+    market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+    market_closed = now.replace(hour=16, minute=0, second=0, microsecond=0)
 
     if now < market_open or now > market_closed:
-        log.info(f"Market is Closed - {time.strftime('%l:%M %p')}")
+        #log.info(f"Market is Closed - {time.strftime('%l:%M %p')}")
         return False
     else:
-        log.info(f"Market is Open - {time.strftime('%l:%M %p')}")
+        #log.info(f"Market is Open - {time.strftime('%l:%M %p')}")
         return True
     return True
 
@@ -176,7 +176,7 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
 
         while order_status == 'accepted' or order_status == 'new' and order_status != 'partially_filled' and order_status != 'filled' and order_status != 'canceled' and order_status != 'done_for_day' and order_status != 'replaced' and order_status != 'pending_replace' and retry < 5 and marketOpen:
             time.sleep(15)
-            log.info(f'Order Retry is {retry}')
+            log.info(f'Order Retry is {retry}/5')
 
             # Modify Buy Limit Price
             if side == 'buy':
@@ -523,23 +523,6 @@ def alpaca():
         else:
             order_type = json_data['order_type']
 
-        # Get Quantity
-        if 'qty' not in json_data:
-            qty = math.floor(buying_power // limit_price)
-        else:
-            qty = json_data['qty']
-
-
-        # Print Variables
-        log.info(f'Ticker is {ticker}')
-        log.info(f'Inverse Ticker is {inverse_ticker}')
-        log.info(f'Using Inverse Trading Mode? {inverse_mode}')
-        log.info(f'Original Price is ${price}')
-        log.info(f'Side is {side}')
-        log.info(f'Time-In-Force is {time_in_force}')
-        log.info(f'Order Type is {order_type}')
-        log.info(f'Quantity is {qty}')
-
         # Get Stop Loss
         if 'stop' not in json_data and side == 'buy':
             log.error(f'Error: User: {user} - No Stop Loss was given for Buy. Stop Loss is required.')
@@ -590,6 +573,27 @@ def alpaca():
             diff = round(abs(limit_price - price),2)
 
             log.info(f'Selling Limit Price is: ${price} - ${diff} = ${limit_price}')
+
+        # Get Quantity
+        if 'qty' not in json_data:
+            if side == 'buy':
+                qty = math.floor(buying_power // limit_price)
+            elif side == 'sell':
+                position = checkPositionExists(api, user, side, ticker, False)
+                qty = int(position.qty)
+        else:
+            qty = json_data['qty']
+
+
+        # Print Variables
+        log.info(f'Ticker is {ticker}')
+        log.info(f'Inverse Ticker is {inverse_ticker}')
+        log.info(f'Using Inverse Trading Mode? {inverse_mode}')
+        log.info(f'Original Price is ${price}')
+        log.info(f'Side is {side}')
+        log.info(f'Time-In-Force is {time_in_force}')
+        log.info(f'Order Type is {order_type}')
+        log.info(f'Quantity is {qty}')
 
         # Check if Account is Blocked
         if account.trading_blocked:
