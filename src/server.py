@@ -32,10 +32,10 @@ log.addHandler(consoleHandler)
 
 def marketIsOpen():
     now = datetime.now()
-    #market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
-    #market_closed = now.replace(hour=20, minute=0, second=0, microsecond=0)
-    market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
-    market_closed = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
+    market_closed = now.replace(hour=20, minute=0, second=0, microsecond=0)
+    #market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+    #market_closed = now.replace(hour=16, minute=0, second=0, microsecond=0)
 
     if now < market_open or now > market_closed:
         #log.info(f"Market is Closed - {time.strftime('%l:%M %p')}")
@@ -106,22 +106,22 @@ def checkOpenOrders(api, user, qty, side, ticker, position):
 
     print(position)
     if position is not None and int(position.qty) == open_order_qty and side == 'sell':
-        log.error(f'Error: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
-        sendDiscordMessage(f'Error: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
-        return f'Error: There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.', 400
+        log.error(f'Failed: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
+        sendDiscordMessage(f'Failed: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
+        return f'Failed: There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.', 400
     elif position is not None and int(position.qty) <= qty:
         if int(open_order_qty) - qty == 0 and side == 'sell':
-            log.error(f'Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}')
-            sendDiscordMessage(f'Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}')
-            return f'Error: There is already an Open order to sell {open_order_qty} of {ticker}', 400
+            log.error(f'Failed: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}')
+            sendDiscordMessage(f'Failed: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}')
+            return f'Failed: There is already an Open order to sell {open_order_qty} of {ticker}', 400
 
         elif int(open_order_qty) - qty > 0 and side == 'sell':
             log.warning(f'Warning: User: {user} - You are selling {open_order_qty} of {ticker}, which would leave {int(open_order_qty) - qty} leftover.')
     elif position is not None and int(position.qty) > qty:
         if int(open_order_qty) - qty == 0 and side == 'sell':
-            log.error(f'Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}.')
-            sendDiscordMessage(f'Error: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}.')
-            return f'Error: There is already an Open order to sell {open_order_qty} of {ticker}.', 400
+            log.error(f'Failed: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}.')
+            sendDiscordMessage(f'Failed: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}.')
+            return f'Failed: There is already an Open order to sell {open_order_qty} of {ticker}.', 400
         elif int(open_order_qty) - qty > 0 and side == 'sell':
             log.warning(f'Warning: User: {user} - You are selling {open_order_qty} of {ticker}, which would leave {abs(int(open_order_qty) - qty)} leftover.')
 
@@ -146,8 +146,8 @@ def checkPositionExists(api, user, side, ticker, inverse_trade):
         log.info(f'No position for {ticker} found. Proceeding...')
     elif position is None and side == 'sell':
         if not inverse_trade:
-            log.info(f'User {user} - You have no position in {ticker} to sell.')
-            sendDiscordMessage(f'Error: User {user} - You have no position in {ticker} to sell.')
+            log.info(f'Failed: User {user} - You have no position in {ticker} to sell.')
+            sendDiscordMessage(f'Failed: User {user} - You have no position in {ticker} to sell.')
             return None
         elif inverse_trade:
             log.info(f'User {user} - Has no position in {ticker} to sell. Will buy Inverse Ticker.')
@@ -170,7 +170,7 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
         log.info(f'Original Buy Order ID: {order_id}')
 
         if not marketIsOpen():
-            raise Exception(f"Error: Order to {side} {qty} shares of {ticker} was submitted but cannot be filled - Market is Closed")
+            raise Exception(f"Failed: Order to {side} {qty} shares of {ticker} was submitted but cannot be filled - Market is Closed")
         else:
             marketOpen = marketIsOpen()
 
@@ -266,7 +266,7 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
         log.info(f'Last Order status is: {order_status}')
 
     if retry >= 5:
-        return f'Error: Retry limit reached to {side} {qty} of {ticker}. Aborting.'
+        return f'Failed: Retry limit reached to {side} {qty} of {ticker}. Aborting.'
     elif retry < 5 and order_status == 'filled' or order_status == 'partially_filled':
         return f'{order_status}'
     elif retry < 5 and order_status == 'canceled' or order_status == 'done_for_day' or order_status == 'replaced' or order_status == 'pending_replace':
@@ -291,8 +291,8 @@ def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, 
             )
         except tradeapi.rest.APIError as e:
             if e == 'account is not authorized to trade':
-                log.error(f'Error: {e} - Check your API Keys are correct')
-                return f'Error: {e} - Check your API Keys correct', 500
+                log.error(f'Failed: {e} - User: {user} - Check your API Keys are correct')
+                return f'Failed: {e} - User: {user} - Check your API Keys correct', 500
             else:
                 log.error(f'Error submitting Order: {e}')
                 return f'Error submitting Order: {e}', 500
@@ -315,8 +315,8 @@ def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, 
             )
         except tradeapi.rest.APIError as e:
             if e == 'account is not authorized to trade':
-                log.error(f'Error: {e} - Check your API Keys are correct')
-                return f'Error: {e} - Check your API Keys correct', 500
+                log.error(f'Failed: {e} - User: {user} - Check your API Keys are correct')
+                return f'Failed: {e} - User: {user} - Check your API Keys correct', 500
             else:
                 log.error(f'Error submitting Order: {e}')
                 return f'Error submitting Order: {e}', 500
@@ -326,9 +326,9 @@ def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, 
 def orderFlow(api, user, user_key, ticker, position, buying_power, qty, side, order_type, time_in_force, limit_price, stop_limit_price, client_order_id, new_stop):
     # Order Flow
     if buying_power <= 0 and side == 'buy':
-        log.error(f'Error: User: {user} - You have no Buying Power: ${buying_power}')
-        sendDiscordMessage(f'Error: User: {user} - You have no Buying Power: ${buying_power}')
-        return f'Error: You have no Buying Power: ${buying_power}', 400
+        log.info(f'Failed: User: {user} - You have no Buying Power: ${buying_power}')
+        sendDiscordMessage(f'Failed: User: {user} - You have no Buying Power: ${buying_power}')
+        return f'Failed: You have no Buying Power: ${buying_power}', 400
     elif buying_power > 0 and side == 'buy':
         if qty > 0 and math.floor(buying_power // qty) > 0:
             # Submit Order with Stop Loss
@@ -355,13 +355,13 @@ def orderFlow(api, user, user_key, ticker, position, buying_power, qty, side, or
                     sendDiscordMessage(status)
                     return f'{status}', 200
             else:
-                log.error(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
-                sendDiscordMessage(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
-                return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 400
+                log.info(f'Failed: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
+                sendDiscordMessage(f'Failed: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
+                return f'Failed: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}', 400
         else:
-            log.error(f'Error: User: {user} - Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.')
-            sendDiscordMessage(f'Error: User: {user} - Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.')
-            return f'Error: Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.', 400
+            log.info(f'Failed: User: {user} - Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.')
+            sendDiscordMessage(f'Failed: User: {user} - Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.')
+            return f'Failed: Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.', 400
     elif position is not None and int(position.qty) > 0 and side == 'sell':
         if int(qty) <= int(position.qty):
             order_type = 'limit'
@@ -398,17 +398,17 @@ def orderFlow(api, user, user_key, ticker, position, buying_power, qty, side, or
                     sendDiscordMessage(status)
                     return f'{status}', 500
             else:
-                log.error(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
-                sendDiscordMessage(f'Error: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
-                return f'Error: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.', 400
+                log.info(f'Failed: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
+                sendDiscordMessage(f'Failed: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
+                return f'Failed: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.', 400
         else:
-            log.error(f'Error: User: {user} - You cannot sell {qty} when you only have {position.qty}.')
-            sendDiscordMessage(f'Error: User: {user} - You cannot sell {qty} when you only have {position.qty}.')
-            return f'Error: You cannot sell {qty} when you only have {position.qty}', 400
+            log.info(f'Failed: User: {user} - You cannot sell {qty} when you only have {position.qty}.')
+            sendDiscordMessage(f'Failed: User: {user} - You cannot sell {qty} when you only have {position.qty}.')
+            return f'Failed: You cannot sell {qty} when you only have {position.qty}', 400
     else:
-        log.error(f'Error: User {user} - Data Payload was empty!')
-        sendDiscordMessage(f'Error: User {user} - Data Payload was empty!')
-        return f'Error: Data Payload was empty!', 400 
+        log.info(f'Failed: User {user} - Data Payload was empty!')
+        sendDiscordMessage(f'Failed: User {user} - Data Payload was empty!')
+        return f'Failed: Data Payload was empty!', 400 
 
 app = Flask(__name__)
 
@@ -435,12 +435,12 @@ def alpaca():
     base_stop_price_minimum_multiplier = .9999
 
     if request.args.get('APCA_API_KEY_ID') is None:
-        log.error(f'Error: APCA_API_KEY_ID is not set!')
-        sendDiscordMessage(f'Error: APCA_API_KEY_ID is not set!')
+        log.info(f'Failed: APCA_API_KEY_ID is not set!')
+        sendDiscordMessage(f'Failed: APCA_API_KEY_ID is not set!')
         return 'APCA_API_KEY_ID is not set!', 400
     if request.args.get('APCA_API_SECRET_KEY') is None:
-        log.error(f'Error: APCA_API_SECRET_KEY is not set!')
-        sendDiscordMessage(f'Error: APCA_API_SECRET_KEY is not set!')
+        log.info(f'Failed: APCA_API_SECRET_KEY is not set!')
+        sendDiscordMessage(f'Failed: APCA_API_SECRET_KEY is not set!')
         return 'APCA_API_SECRET_KEY is not set!', 400
 
     user = request.args.get('APCA_API_KEY_ID')
@@ -577,10 +577,22 @@ def alpaca():
         # Get Quantity
         if 'qty' not in json_data:
             if side == 'buy':
-                qty = math.floor(buying_power // limit_price)
+                if buying_power - limit_price >= limit_price:
+                    temp_qty = math.floor(buying_power - limit_price)
+                    qty = math.floor(temp_qty // limit_price)
+                    log.info(f'{buying_power} - {limit_price} / {limit_price} = {qty}')
+                else:
+                    log.info(f'Failed: User {user} - You dont have enough buying power to buy 1 share of {ticker}.')
+                    sendDiscordMessage(f'Failed: User {user} -You dont have enough buying power to buy 1 share of {ticker}.')
+                    return f'Failed: User {user} - You dont have enough buying power to buy 1 share of {ticker}.', 500
             elif side == 'sell':
                 position = checkPositionExists(api, user, side, ticker, False)
-                qty = int(position.qty)
+                if position is not None:
+                    qty = int(position.qty)
+                else:
+                    log.info(f'Failed: User {user} - You have no position in {ticker} to sell.')
+                    sendDiscordMessage(f'Failed: User {user} - You have no position in {ticker} to sell.')
+                    return f'Failed: User {user} - You have no position in {ticker} to sell.', 500
         else:
             qty = json_data['qty']
 
@@ -597,7 +609,7 @@ def alpaca():
 
         # Check if Account is Blocked
         if account.trading_blocked:
-            sendDiscordMessage(f'Error: User: {user} - Account is currently restricted from trading.')
+            sendDiscordMessage(f'Failed: User: {user} - Account is currently restricted from trading.')
             return 'Account is currently restricted from trading.', 400
 
         if inverse_mode:
