@@ -32,10 +32,10 @@ log.addHandler(consoleHandler)
 
 def marketIsOpen():
     now = datetime.now()
-    #market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
-    #market_closed = now.replace(hour=20, minute=0, second=0, microsecond=0)
-    market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
-    market_closed = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
+    market_closed = now.replace(hour=20, minute=0, second=0, microsecond=0)
+    #market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+    #market_closed = now.replace(hour=16, minute=0, second=0, microsecond=0)
 
     if now < market_open or now > market_closed:
         log.info(f"Market is Closed - {time.strftime('%l:%M %p')}")
