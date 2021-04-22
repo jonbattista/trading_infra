@@ -362,7 +362,7 @@ def orderFlow(api, user, user_key, ticker, position, buying_power, qty, side, or
             log.error(f'Error: User: {user} - Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.')
             sendDiscordMessage(f'Error: User: {user} - Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.')
             return f'Error: Not enough Buying Power (${buying_power}) to buy {qty} shares of {ticker} at limit price ${limit_price}.', 400
-    elif int(position.qty) > 0 and side == 'sell':
+    elif position is not None and int(position.qty) > 0 and side == 'sell':
         if int(qty) <= int(position.qty):
             order_type = 'limit'
             new_stop = None
