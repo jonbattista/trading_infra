@@ -17,7 +17,7 @@ import logging
 from sys import stdout
 import math
 import time
-from datetime import datetime
+from datetime import datetime, date, timezone
 from datetime import date
 from discord import Webhook, RequestsWebhookAdapter
 import inspect
@@ -32,10 +32,13 @@ log.addHandler(consoleHandler)
 
 def marketIsOpen():
     now = datetime.now()
-    market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
-    market_closed = now.replace(hour=20, minute=0, second=0, microsecond=0)
-    #market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
-    #market_closed = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    tz_string = datetime.now(timezone.utc).astimezone().tzname()
+    if tz_string == 'UTC':
+        market_open = now.replace(hour=13, minute=30, second=0, microsecond=0)
+        market_closed = now.replace(hour=20, minute=0, second=0, microsecond=0)
+    elif tz_string == 'EDT' or tz_string == 'EST':
+        market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+        market_closed = now.replace(hour=16, minute=0, second=0, microsecond=0)
 
     if now < market_open or now > market_closed:
         #log.info(f"Market is Closed - {time.strftime('%l:%M %p')}")
@@ -158,6 +161,16 @@ def checkPositionExists(api, user, side, ticker, inverse_trade):
         return None
 
 def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, time_in_force, limit_price, client_order_id, stop):
+    new_buy_limit_price_mulitplier = 1.005
+
+    new_buy_stop_price_multiplier = .9945
+
+    new_buy_stop_limit_price_multiplier = .9925
+
+    base_stop_price_minimum_multiplier = .9999
+
+    new_sell_stop_limit_price_multiplier = .9925
+
     log.info(f'Checking Status for Client Order ID: {client_order_id}')
     order = api.get_order_by_client_order_id(client_order_id)
 
@@ -180,13 +193,13 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
 
             # Modify Buy Limit Price
             if side == 'buy':
-                new_limit_price = round(float(order.limit_price) * 1.005, 2)
+                new_limit_price = round(float(order.limit_price) * new_buy_limit_price_mulitplier, 2)
                 if order is not None and order.legs is not None: 
-                    stop_limit_price = round(float(order.legs[0].stop_price) * .9925, 2)
-                    new_stop = round(float(order.legs[0].stop_price) * .9945, 2)
+                    stop_limit_price = round(float(order.legs[0].stop_price) * new_buy_stop_limit_price_multiplier, 2)
+                    new_stop = round(float(order.legs[0].stop_price) * new_buy_stop_price_multiplier, 2)
                 else:
-                    stop_limit_price = round(float(stop) * .9925, 2)
-                    new_stop = round(float(stop) * .9945, 2)
+                    stop_limit_price = round(float(stop) * new_buy_stop_limit_price_multiplier, 2)
+                    new_stop = round(float(stop) * new_buy_stop_price_multiplier, 2)
 
                 order = api.get_order(order_id)
                 order_id = order.id
@@ -206,13 +219,14 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
                     )
                     order_id = order.id
                     order_status = order.status
+                    print(order)
                     # Modify the stop loss
-                    #order = api.replace_order(
-                        #order_id=order.id,
-                        #qty=qty,
-                        #time_in_force=time_in_force,
-                        #limit_price=new_limit_price
-                    #)
+#                    order = api.replace_order(
+#                        order_id=order.id,
+#                        qty=qty,
+#                        time_in_force=time_in_force,
+#                        limit_price=new_limit_price
+#                    )
                     log.info(f'Modified Buy Order ID: {order_id}')
                 except tradeapi.rest.APIError as err:
                     log.error(f'Error modifying buy order: {err.response.content}')
@@ -225,7 +239,7 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
                 log.info(f'Buy Order status is: {order_status}')
             # Modify Sell Limit Price
             elif side == 'sell':
-                new_limit_price = round(float(order.limit_price) * .9925, 2)
+                new_limit_price = round(float(order.limit_price) * new_sell_stop_limit_price_multiplier, 2)
                 order = api.get_order(order_id)
                 order_id = order.id
                 order_status = order.status
