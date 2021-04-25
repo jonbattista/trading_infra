@@ -678,11 +678,12 @@ def alpaca():
 
                 inverse_position = checkPositionExists(api, user, inverse_side, inverse_ticker, True)
 
-                # Check that inverse_position is not empty and is a tuple
+                # Check if you already have inverse_position
                 if inverse_position is not None and type(inverse_position) == 'tuple':
                     return f'{inverse_position}', 500
                 print(inverse_position)
 
+                # Otherwies buy the Inverse Ticker
                 try:
                     inverse_last_trade = api.get_last_trade(inverse_ticker)
                 except requests.exceptions.HTTPError as e:
