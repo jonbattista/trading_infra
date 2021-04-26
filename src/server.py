@@ -317,7 +317,7 @@ def alpaca():
 
         # Get Quantity
         if 'qty' not in json_data:
-            qty = math.floor(buying_power // limit_price)
+            qty = math.floor(buying_power // price)
         else:
             qty = json_data['qty']
 
