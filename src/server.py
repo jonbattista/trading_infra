@@ -592,6 +592,9 @@ def alpaca():
                     temp_qty = math.floor(buying_power - limit_price)
                     qty = math.floor(temp_qty // limit_price)
                     log.info(f'{buying_power} - {limit_price} / {limit_price} = {qty}')
+                elif inverse_mode:
+                    log.info(f'Failed: User {user} - You dont have enough buying power to buy 1 share of {ticker}. Selling Inverse Ticker!')
+                    qty = 0
                 else:
                     log.info(f'Failed: User {user} - You dont have enough buying power to buy 1 share of {ticker}.')
                     sendDiscordMessage(f'Failed: User {user} -You dont have enough buying power to buy 1 share of {ticker}.')
@@ -600,10 +603,14 @@ def alpaca():
                 position = checkPositionExists(api, user, side, ticker, False)
                 if position is not None:
                     qty = int(position.qty)
+                elif inverse_mode:
+                    log.info(f'Failed: User {user} - You have no position in {ticker} to sell. Buying Inverse Ticker! ')
+                    qty = 0
                 else:
                     log.info(f'Failed: User {user} - You have no position in {ticker} to sell.')
-                    sendDiscordMessage(f'Failed: User {user} - You have no position in {ticker} to sell.')
-                    return f'Failed: User {user} - You have no position in {ticker} to sell.', 500
+                    sendDiscordMessage(f'Failed: User {user} - Failed: User {user} - You have no position in {ticker} to sell.')
+                    return f'Failed: User {user} - Failed: User {user} - You have no position in {ticker} to sell.', 500
+                    
         else:
             qty = json_data['qty']
 
