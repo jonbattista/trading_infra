@@ -731,11 +731,10 @@ def alpaca():
                 loc_earlier = tz.localize(earlier).replace(microsecond=0).isoformat()
                 log.info(loc_today)
                 log.info(loc_earlier)
-                
+
                 try:
                     last_inverse_trade = api.get_bars(inverse_ticker, TimeFrame.Minute, loc_earlier, loc_today, limit=1, adjustment='raw').df
                 except Exception as e:
-                    while last_inverse_trade
                     log.info(str(e))
                     sendDiscordMessage(str(e))
                     return str(e), 500
