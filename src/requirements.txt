@@ -5,4 +5,4 @@ waitress
 discord.py
 pymongo
 apscheduler
-twelvedata
+python-dotenv

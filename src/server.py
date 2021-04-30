@@ -23,7 +23,11 @@ from discord import Webhook, RequestsWebhookAdapter
 import inspect
 import pytz
 from twelvedata import TDClient
-import config
+from dotenv import load_dotenv
+
+load_dotenv()
+
+API_KEY = os.environ.get('TWELVEDATA_API_KEY')
 
 # Configure Logging for Docker container
 log = logging.getLogger('traitor')
@@ -660,7 +664,7 @@ def alpaca():
                 
                 if inverse_position is not None:
                     try:
-                        inverse_last_trade = requests.get(f"https://api.twelvedata.com/price?symbol={inverse_ticker}&apikey={config.API_KEY}").json()
+                        inverse_last_trade = requests.get(f"https://api.twelvedata.com/price?symbol={inverse_ticker}&apikey={API_KEY}").json()
                         log.info(inverse_last_trade)
                     except requests.exceptions.HTTPError as e:
                         log.error(e)
@@ -677,7 +681,7 @@ def alpaca():
                     except Exception as e:
                         log.info(str(e))
                         sendDiscordMessage(str(e))
-                        
+
                     log.info(inverser_order_results[0])
                     sendDiscordMessage(inverser_order_results[0])
                 else:
@@ -724,12 +728,12 @@ def alpaca():
 
                 # Otherwies buy the Inverse Ticker
                 try:
-                    inverse_last_trade = requests.get(f"https://api.twelvedata.com/price?symbol={inverse_ticker}&apikey={config.API_KEY}").json()
+                    inverse_last_trade = requests.get(f"https://api.twelvedata.com/price?symbol={inverse_ticker}&apikey={API_KEY}").json()
                 except requests.exceptions.HTTPError as e:
                     status_code = e.response.status_code
                     while status_code == '403':
                         try:
-                            inverse_last_trade = requests.get(f"https://api.twelvedata.com/price?symbol={inverse_ticker}&apikey={config.API_KEY}").json()
+                            inverse_last_trade = requests.get(f"https://api.twelvedata.com/price?symbol={inverse_ticker}&apikey={API_KEY}").json()
                             status_code = e.response.status_code
                         except requests.exceptions.HTTPError as e:
                             log.error(e)
@@ -753,7 +757,7 @@ def alpaca():
                 log.info(loc_earlier)
 
                 try:
-                    res = requests.get(f'https://api.twelvedata.com/time_series?symbol={inverse_ticker}&interval=1min&apikey={config.API_KEY}').json()
+                    res = requests.get(f'https://api.twelvedata.com/time_series?symbol={inverse_ticker}&interval=1min&apikey={API_KEY}').json()
                     last_inverse_trade = res['values'][0]
                 except Exception as e:
                     log.info(str(e))
