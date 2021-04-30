@@ -3,3 +3,6 @@ alpaca_trade_api
 sendgrid
 waitress
 discord.py
+pymongo
+apscheduler
+twelvedata
