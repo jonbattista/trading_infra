@@ -80,7 +80,6 @@ def sendDiscordMessage(message):
 def checkOpenOrders(api, user, qty, side, ticker, position, inverse_mode):
     open_orders = api.list_orders()
     
-    # Check if there are any open orders
     if not open_orders:
         log.info('No Open Orders found.')
     else:
@@ -94,12 +93,7 @@ def checkOpenOrders(api, user, qty, side, ticker, position, inverse_mode):
             open_order_ticker_count += 1
 
     log.info(f'There are {open_order_ticker_count} Open Orders for {ticker}')
-    #log.info(position)
-    #log.info(int(position.qty))
-    #log.info(f'position qty is less than or equal to order qty: {int(position.qty) <= qty}')
-    #log.info(f'position qty is greater than order qty: {int(position.qty) > qty}')
-    #log.info(f'open order qty minus order qty is less than or equal to 0: {int(open_order_qty) - qty <= 0}')
-    #log.info(f'open order qty minus order qty is greater than 0: {int(open_order_qty) - qty > 0}')
+
     for open_order in open_orders:
         if open_order.symbol == ticker:
             log.info(f'Canceling {open_order.order_type} Order ID: {open_order.id}')
@@ -142,7 +136,6 @@ def checkOpenOrders(api, user, qty, side, ticker, position, inverse_mode):
     return None
 
 def checkPositionExists(api, user, side, ticker, inverse_trade):
-    # Get Positions
     portfolio = api.list_positions()
 
     if not portfolio:
@@ -152,7 +145,6 @@ def checkPositionExists(api, user, side, ticker, inverse_trade):
 
         position = next((position for position in portfolio if position.symbol == ticker), None)
 
-        # Check if there is already a Position for Ticker
         if position is not None and side == 'buy':
             log.info(f'User: {user} - You have a Position of {position.qty} shares in {ticker}')
             return position
@@ -190,8 +182,6 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
         order_status = order.status
         log.info(f'Initial Order status is {order_status}')
 
-        #log.info(f'Original Buy Order ID: {order_id}')
-
         if not marketIsOpen():
             raise Exception(f"Failed: Order to {side} {qty} shares of {ticker} was submitted but cannot be filled - Market is Closed")
         else:
@@ -201,7 +191,6 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
             time.sleep(15)
             log.info(f'Order Retry is {retry}/5')
 
-            # Modify Buy Limit Price
             if side == 'buy':
                 new_limit_price = round(float(order.limit_price) * new_buy_limit_price_mulitplier, 2)
                 if order is not None and order.legs is not None: 
@@ -229,13 +218,7 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
                     )
                     order_id = order.id
                     order_status = order.status
-                    # Modify the stop loss
-#                    order = api.replace_order(
-#                        order_id=order.id,
-#                        qty=qty,
-#                        time_in_force=time_in_force,
-#                        limit_price=new_limit_price
-#                    )
+
                     log.info(f'Modified Buy Order ID: {order_id}')
                 except tradeapi.rest.APIError as err:
                     log.error(f'Error modifying buy order: {err.response.content}')
@@ -246,7 +229,7 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
                 log.info(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
                 stop = new_stop
                 log.info(f'Buy Order status is: {order_status}')
-            # Modify Sell Limit Price
+
             elif side == 'sell':
                 new_limit_price = round(float(order.limit_price) * new_sell_stop_limit_price_multiplier, 2)
                 order = api.get_order(order_id)
@@ -299,9 +282,7 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
         log.info('Order was empty!')
         return None
 
-def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, stop):
-    # Submit Order with Stop Loss
-    
+def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, stop):    
     if stop is None and stop_limit_price is None and side == 'sell':
         try:
             order = api.submit_order(
@@ -346,7 +327,6 @@ def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, 
     return None
 
 def orderFlow(api, user, user_key, ticker, position, buying_power, qty, side, order_type, time_in_force, limit_price, stop_limit_price, new_stop):
-    # Order Flow
     if buying_power <= 0 and side == 'buy':
         log.info(f'Failed: User: {user} - You have no Buying Power: ${buying_power}')
         sendDiscordMessage(f'Failed: User: {user} - You have no Buying Power: ${buying_power}')
@@ -354,22 +334,18 @@ def orderFlow(api, user, user_key, ticker, position, buying_power, qty, side, or
     elif buying_power > 0 and side == 'buy':
         if qty > 0:
             if math.floor(buying_power // qty) > 0:
-                # Submit Order with Stop Loss
                 try:
                     order = submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, new_stop)
                 except Exception as e:
                     raise
-                #log.info(order)
                 if order.status == 'accepted':
                     log.info (f'Pending: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
 
-                    # Check that order if filled
                     try:
                         status = watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, time_in_force, limit_price, order.id, new_stop)
                     except Exception as e:
                         sendDiscordMessage(str(e))
                         return str(e), 500
-                    #log.info(status)
                     if 'filled' in status or 'partially_filled' in status:
                         return f'Success: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {status}.', 200
                     else:
@@ -400,13 +376,11 @@ def orderFlow(api, user, user_key, ticker, position, buying_power, qty, side, or
             if order.status == 'accepted':
                 log.info (f'Pending: User: {user} - Order to {side} of {qty} shares of {ticker} at ${limit_price} was {order.status}.')
 
-                # Check that order if filled
                 try:
                     status = watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, time_in_force, limit_price, order.id, new_stop)
                 except Exception as e:
                     sendDiscordMessage(str(e))
                     return str(e), 500
-                #log.info(status)
                 
                 if 'filled' in status or 'partially_filled' in status:
                     return f'Success: Order to {side} of {qty} shares of {ticker} at ${limit_price} was {status}.', 200
