@@ -34,7 +34,7 @@ def on_open(ws):
     ws.send(json.dumps({
       "action": "subscribe", 
       "params": {
-        "symbols": "TQQQ"
+        "symbols": "BTC/USD"
       }
     }))
 
@@ -60,3 +60,4 @@ if __name__ == "__main__":
         run_connection(ws)
     except Exception as e:
         print(e)
+
