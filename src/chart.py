@@ -20,7 +20,7 @@ from dash.dependencies import Output, Input
 
 now = datetime.now(timezone('UTC'))
 
-stock = 'btc-usd'  # input("Enter a Ticker: ")
+stock = 'TQQQ'  # input("Enter a Ticker: ")
 initial_candle = True
 avd = -1
 count = None
@@ -101,17 +101,18 @@ def fetchLastCandles(td):
     global df
 
     ts = td.time_series(
-        symbol="BTC/USD",
-        outputsize=3,
-        interval="1h",
-        timezone="America/New_York"
+        symbol=stock,
+        outputsize=5,
+        interval="1min",
+        timezone="America/New_York",
+        order='asc'
     )
     df = ts.as_pandas()
 
     if first_run == True:
         first_run = False
         sched = BlockingScheduler()
-        sched.add_job(fetchLastCandles, 'interval', args=[td], hours=1)
+        sched.add_job(fetchLastCandles, 'interval', args=[td],  minute='0-59', second='25')
         sched.start()
 
 def buildCandleDataFrame(live, data):
@@ -148,6 +149,7 @@ def buildCandleDataFrame(live, data):
     removed = data.drop(pd.Timestamp(index_stamp))
 
     new_data = removed.append(new_candle)
+    print(new_data)
     return new_data
 
 app = dash.Dash(__name__)
@@ -177,11 +179,10 @@ def update_candles(n):
     global df
     global initial_candle
     global new_data
-    global ticker
+    global stock
     global td
     global first_run
 
-    ticker = "BTC/USD"
     old_data = None
 
     fig = go.Figure()
@@ -190,9 +191,9 @@ def update_candles(n):
         print('first run')
         fetchLastCandles(td)
 
-    price = requests.get(f"https://api.twelvedata.com/price?symbol={ticker}&apikey={config.API_KEY}").json()
+    price = requests.get(f"https://api.twelvedata.com/price?symbol={stock}&apikey={config.API_KEY}").json()
     live = round(float(price['price']), 2)
-    #print(f'Last Data is {live}')
+    print(f'Last Live Price is {live}')
 
     if initial_candle:
         new_data = buildCandleDataFrame(live, df)

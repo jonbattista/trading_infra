@@ -1,19 +1,22 @@
-import pymongo
 import websocket
 import config
 import ssl
 import json
 from apscheduler.schedulers.blocking import BlockingScheduler
 from twelvedata import TDClient
+from sqlalchemy import create_engine
+import pymysql
+import pandas as pd
 
-myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-
-db = myclient["trades"]
-
-stock = db["TQQQ"]
+ticker = "TQQQ"
 
 first_run = True
+
 td = TDClient(apikey=config.API_KEY)
+
+sqlEngine = create_engine(f'mysql+pymysql://root:@127.0.0.1/{ticker}', pool_recycle=3600)
+
+dbConnection = sqlEngine.connect() 
 
 def buildCandleDataFrame(live):
     global td
@@ -112,19 +115,22 @@ def fetchHistoricalData(td):
         prepost=True
     )
     data = ts.as_pandas()
-    print(data)
-    data.reset_index(inplace=True)
-    data_dict = data.to_dict('records')
-    # Insert collection
-    print(data_dict)
-    #stock.insert_many(data_dict)
-    stock.update(
-       { '$set':
-         data_dict
-       })
+    data.to_sql(tableName, dbConnection, if_exists='fail');
 
-    for x in stock.find():
-        print(x)
+    try:
+        frame  = dataFrame.to_sql(tableName, dbConnection, if_exists='fail');
+    except ValueError as vx:
+        print(vx)
+    except Exception as ex:   
+        print(ex)
+    else:
+        print("Table %s created successfully."%tableName);   
+
+    frame = pd.read_sql(f"select * from stocks.{ticker}", dbConnection);
+
+    pd.set_option('display.expand_frame_repr', False)
+    
+    print(frame)
 
     if first_run == True:
         first_run = False
