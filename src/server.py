@@ -644,7 +644,11 @@ def alpaca():
                         log.error(e)
                         return f'{e}', 500
 
-                    inverse_limit_price = round(float(inverse_last_trade['price']), 2)
+                    if 'price' in inverse_last_trade:
+                        inverse_limit_price = round(float(inverse_last_trade['price']), 2)
+                    else:
+                        log.error(inverse_last_trade)
+                        raise
 
                     log.info(f'Last Price for {inverse_ticker} was {inverse_limit_price}')
 
@@ -715,7 +719,11 @@ def alpaca():
                     log.error(e)
                     return f'{e}', 500
 
-                inverse_limit_price = round(float(inverse_last_trade['price']), 2)
+                if 'price' in inverse_last_trade:
+                    inverse_limit_price = round(float(inverse_last_trade['price']), 2)
+                else:
+                    log.error(inverse_last_trade)
+                    raise
 
                 log.info(f'Last Price for {inverse_ticker} was {inverse_limit_price}')
 
