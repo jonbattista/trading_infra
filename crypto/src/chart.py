@@ -1,10 +1,7 @@
 import requests
 import json
 import time
-from twelvedata import TDClient
 import asyncio
-import websocket
-import ssl
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
@@ -15,68 +12,63 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import config
-from apscheduler.schedulers.blocking import BlockingScheduler
 from dash.dependencies import Output, Input
-import ssl
-from threading import Thread
-import websockets
+from sqlalchemy import create_engine
+import pymysql.cursors
+import logging
+from sys import stdout
+import mysql.connector as sql
+
+import pandas as pd
 
 now = datetime.now(timezone('UTC'))
 
-ticker = 'TQQQ'
+ticker = 'BTC/USD'
 initial_candle = True
 avd = -1
 count = None
 date_list = []
 tsl_list = []
+avn_list = []
 new_data = None
 first_run = True
 avn = None
 live_price = None
 data = None
 last_minute = None
+database = "trades"
+old_fig = {}
+tsl_array=[]
 
-def on_message(ws, message):
-    global live_price
-    res = json.loads(message)
-    print(f'WS Message is {message}')
-    if 'price' in res:
-        live_price = res['price']
-        print(f'Latest Price is {live_price}')
-        buildCandleDataFrame(live_price)
+log = logging.getLogger()
+log.setLevel(logging.DEBUG)
+log.propagate = False
+consoleHandler = logging.StreamHandler(stdout)
+log.addHandler(consoleHandler)
 
-def on_error(ws, error):
-    print(error)
+def checkTables(table,cursor):
+    stmt = "SHOW TABLES LIKE '%s' "% ('%'+str(table)+'%')
+    cursor.execute(stmt)
+    result = cursor.fetchone()          
+    return result
 
-def on_close(ws):
-    print("Connection closed")
+def calcTsl(data):
+    live = data["close"].iloc[-1]
 
-def on_open(ws):
-    global ticker
-
-    print('New connection established')
-
-    ws.send(json.dumps({
-      "action": "subscribe", 
-      "params": {
-        "symbols": f'{ticker}'
-      }
-    }))
-    app.run_server(debug=True, port=8080, use_reloader=True)
-    
-def calcTsl(tsl_ts, live):
+    print(f"Last Price is {live}")
     global avn
 
+    print(data)
     now_utc = pytz.utc.localize(datetime.utcnow())
     now_est = now_utc.astimezone(pytz.timezone("America/New_York"))
     now_est = now_est.strftime('%Y-%m-%d %H:%M:%S.%f')#
-    high = tsl_ts.high
+    high = data.high
     #print(tsl_ts)
     #print(high)#
     last3H0 = high.tail(3)  # last 3 including active candle [0]
     last3H1 = high.tail(4).head(3)  # last 3 not including active [1]
     # print(last3H1)#
-    low = tsl_ts.low
+    low = data.low
     # print(low)#
     low3H0 = low.tail(3)  # last 3 including active candle [0]
     low3H1 = low.tail(4).head(3)  # last 3 not including active [1]
@@ -113,9 +105,11 @@ def calcTsl(tsl_ts, live):
     print(f'AVD is {avd}')
     print(f'AVN is {avn}')
     print(f'TSL is {tsl}')
+    tsl_array.append(tsl)
+    print(tsl_array)
     #print(f'Last Price is {live}')
 
-    close_value = new_data.close.tail(1).iloc[0]
+    close_value = data.close.tail(1).iloc[0]
     close = float(close_value)#
     if live > tsl and live > close:
         Buy = True  #Crossover of live price over tsl and higher than last candle close
@@ -130,147 +124,72 @@ def calcTsl(tsl_ts, live):
         Sell = False
         print(f'Crossover Sell is False')
 
-def fetchLastCandles(td):
-    global first_run
-    global data
+def fetchLastCandles(dbConnection):
+    try:
+        data = pd.read_sql_query(f"select * from `{ticker}`", dbConnection);
+    except Exception as e:
+        print(e)
+    
+    pd.set_option('display.expand_frame_repr', False)
+    print(f"Fetched Table: {data}")
+    return data
 
-    if first_run == True:
-        first_run = False
-        sched = BlockingScheduler()
-        print('Adding fetchLastCandles job!')
-        sched.add_job(fetchLastCandles, 'cron', args=[td], minute='0-59', second='25')
-        sched.start()
+app = dash.Dash(__name__,suppress_callback_exceptions=True)
 
-    #print('Fetching Latest Candles!')
-    ts = td.time_series(
-        symbol=ticker,
-        outputsize=4,
-        interval="1min",
-        timezone="America/New_York",
-        order='asc',
-        prepost=True
-    )
-    data = ts.as_pandas()
+def serve_layout():
+    return html.Div(children=[
 
-    #print(data)
-
-def buildCandleDataFrame(live):
-    global td
-    global data
-    global new_data
-    global current_minute
-    global last_minute
-
-    if data is None:
-        fetchLastCandles(td)
-        time.sleep(3)
-
-    open_value = round(data['open'].iloc[-1], 2)
-    high_value = round(data['high'].iloc[-1], 2)
-    low_value = round(data['low'].iloc[-1], 2)
-    close_value = round(data['close'].iloc[-1], 2)
-
-    # Set the high value if it is greater than the open
-    if live > high_value:
-        print(f'Updating High Value from {high_value} to {live}')
-        high_value = live
-
-    # Set the low value if it is less than the open
-    if live < low_value:
-        print(f'Updating Low Value from {low_value} to {live}')
-        low_value = live
-
-    # After we have receieved any value, set close to current value
-    if live != close_value:
-        print(f'Updating Close Value from {close_value} to {live}')
-        close_value = live
-
-    todays_date = datetime.now()
-    index = pd.date_range(todays_date, periods=1, freq='D')
-
-    input = {'open':open_value, 'high':high_value,'low':low_value,'volume':0,'close':close_value}
-
-    new_candle = pd.DataFrame(input, index=index)
-    date = datetime.now()
-    current_minute = date.strftime('%Y-%m-%d %H:%M:00.000000')
-    #print(f'Last Minute was {current_minute}')
-    print(f'Current Minute is {current_minute}')
-
-#    if current_minute != last_minute and last_minute is not None:
-#        new_candle.index.values[0] = pd.Timestamp(current_minute)
-#        new_candle.index.values[1] = pd.Timestamp(last_minute)
-#    else:
-#        last_minute = current_minute
-#        new_candle.index.values[0] = pd.Timestamp(current_minute)
-    new_candle.index.values[0] = pd.Timestamp(current_minute)
-    print(f'New Candle is {new_candle}')
-    index_len = len(data.index.tolist())
-
-    if index_len > 4 :
-        stamp = data.index.tolist()
-        index_stamp = stamp[len(stamp)-1]
-
-        removed = data.drop(pd.Timestamp(index_stamp))
-        new_data = removed.append(new_candle)
-    else:
-        new_data = data.append(new_candle)
-
-app = dash.Dash(__name__)
-app.layout = html.Div(children=[
-
-    dcc.Graph(id = 'candles', animate = True),
-    dcc.Graph(id = 'tsl', animate = True, figure={}),
+    dcc.Graph(id = 'candles'),
+    html.Div([
+        html.Div([
+            dcc.Graph(id = 'tsl'),
+        ], className='six columns'),
+        html.Div([
+            dcc.Graph(id = 'avn'),
+        ], className='six columns')
+    ], className='row'),
     dcc.Interval(
         id = 'interval-component',
-        interval = 5*1000,
+        interval = 10*1000,
         n_intervals = 0
         ),
-])
+    ])
+
+app.layout = serve_layout
   
 @app.callback(
     Output('candles', 'figure'),
     [Input('interval-component', 'n_intervals')]
 )
 def update_candles(n):
-    global count
-    global data
-    global initial_candle
-    global new_data
     global ticker
-    global td
-    global first_run
-    global live_price
-    global ws
+    global old_fig
+    global database
+    global new_data
+
+    try:
+        sqlEngine = create_engine(f'mysql+pymysql://root:{config.DB_PASS}@127.0.0.1/{database}', pool_recycle=3600)
+    except Exception as e:
+        print(e)
+
+    connection = sqlEngine.raw_connection()
+    cursor = connection.cursor()
+    dbConnection = sqlEngine.connect()
 
     fig = go.Figure()
 
-    if first_run == True:
-        print('First run!')
-        fetchLastCandles(td)
-
-    if live_price == None:
-        price = requests.get(f"https://api.twelvedata.com/price?symbol={ticker}&apikey={config.API_KEY}").json()
-        live_price = round(float(price['price']), 2)
-    #f"https://api.twelvedata.com/time_series?symbol={ticker}&exchange=Binance&interval=1min&apikey={config.API_KEY}"
-
-    #live = round(float(price['price']), 2)
-    #print(f'Last Data is {live}')
-
-    if initial_candle:
-        buildCandleDataFrame(live_price)
-        initial_candle = False
-        count = 0
-    #else:
-    #     new_data = buildCandleDataFrame()
+    new_data = fetchLastCandles(dbConnection)
+    dbConnection.close()
+    
     if new_data is not None:
-        buildCandleDataFrame(live_price)
-        print(f'New Data is {new_data}')
-        calcTsl(new_data, live_price)
-        candlesticks = go.Candlestick(x=new_data.index,
+        calcTsl(new_data)
+
+        candlesticks = go.Candlestick(x=new_data['datetime'],
                                open=new_data['open'],
                                high=new_data['high'],
                                low=new_data['low'],
                                close=new_data['close'], name='Market Data')
+
         fig.add_trace(candlesticks)
 
         # Add Titles
@@ -283,19 +202,17 @@ def update_candles(n):
         fig.update_xaxes(
             rangeslider_visible=True,
             rangeselector={'buttons': list((
-                #  dict(count=15, label="15min", step="minute", stepmode="backward"),
-                # dict(count=45, label="45min", step="minute", stepmode="backward"),
                 dict(count=15, label="15m", step="minute", stepmode="backward"),
                 dict(count=30, label="30m", step="minute", stepmode="backward"),
                 dict(count=1, label="1h", step="hour", stepmode="backward"),
                 dict(count=2, label="2h", step="hour", stepmode="backward"),
                 dict(step="all")
             ))})
-        count += 1
-        #print(f'Candlestick Fig is {fig}')
+        old_fig = fig
+
         return fig
     else:
-        return {}
+        return old_fig
 
 @app.callback(
     Output('tsl', 'figure'),
@@ -303,11 +220,32 @@ def update_candles(n):
 )
 def update_tsl(n):
     global new_data
-    global live_price
     global tsl_list
+    global date_list
+
+    table = f"{ticker}-live"
+    connection = pymysql.connect(host='localhost',
+                             user='root',
+                             password=config.DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
+
+    connection.autocommit(True)
+
+    with connection:
+        with connection.cursor() as cursor:
+            if checkTables(table, cursor):
+                sql = f"SELECT * FROM `{table}`"
+                cursor.execute(sql)
+                res = cursor.fetchone()
+                live_price = res['price']
 
     fig = go.Figure()
+    print(f'Live Price is {live_price}')
     print(f'TSL New Data is {new_data}')
+
     if new_data is not None:
         now_utc = pytz.utc.localize(datetime.utcnow())
         now_est = now_utc.astimezone(pytz.timezone("America/New_York"))
@@ -326,6 +264,7 @@ def update_tsl(n):
         res1 = float(max(last3H1))#
         sup0 = float(min(low3H0))  # Min of prior including active [0]
         sup1 = float(min(low3H1))
+
         # print(f'Resistance 0 is {res0}')
         # print(f'Resistance 1 is {res1}')
         # print(f'Support 0 is {sup0}')
@@ -349,13 +288,16 @@ def update_tsl(n):
         if avn == 1:
             tsl = sup0
         else:
-            tsl = res0#
+            tsl = res0
+        avn_list.append(avn)
+        print(f"AVN List is {avn_list}")
         # print(f'AVD is {avd}')
         # print(f'AVN is {avn}')
         # print(f'TSL is {tsl}')
         # print(f'Last Price is {live_price}') #
         close_value = new_data.close.tail(1).iloc[0]
-        close = float(close_value)#
+        close = float(close_value)
+
         if live_price > tsl and live_price > close:
             Buy = True  #Crossover of live price over tsl and higher than last candle close
         else:
@@ -363,8 +305,7 @@ def update_tsl(n):
         if live_price < tsl and live_price < close:
             Sell = True #Crossunder of live price under tsl and lower than last candle close
         else:
-            Sell = False
-
+            Sell = False#
         #print(now_est)
         date_list.append(now_est)
         tsl_list.append(tsl)
@@ -373,6 +314,7 @@ def update_tsl(n):
                 y=tsl_list,
                 mode='lines'
             )
+
         #print(f'TSL is {tsl}')
         fig.add_trace(tsl)
             # Add Titles
@@ -384,53 +326,54 @@ def update_tsl(n):
         fig.update_xaxes(
             rangeslider_visible=True,
             rangeselector={'buttons': list((
+                dict(count=150, label="15m", step="minute", stepmode="backward"),
+                dict(count=300, label="30m", step="minute", stepmode="backward"),
+                dict(count=600, label="1h", step="hour", stepmode="backward"),
+                dict(count=1200, label="2h", step="hour", stepmode="backward"),
+                dict(step="all")
+        ))})
+        print(f'TSL Fig is {fig}')
+        return fig
+    else:
+        return {}
+    
+@app.callback(
+    Output('avn', 'figure'),
+    [Input('interval-component', 'n_intervals')]
+)
+def update_avn(n):
+    global avn_list
+    global date_list
+
+    if avn_list is not None and date_list is not None:
+        fig = go.Figure()
+
+        avn = go.Scatter(
+            x=date_list,
+            y=avn_list,
+            mode='lines'
+        )
+
+        fig.add_trace(avn)
+
+        fig.update_layout(
+            title='AVN',
+            yaxis_title='AVN'
+        )
+
+        fig.update_xaxes(
+            rangeslider_visible=True,
+            rangeselector={'buttons': list((
                 dict(count=15, label="15m", step="minute", stepmode="backward"),
                 dict(count=30, label="30m", step="minute", stepmode="backward"),
                 dict(count=1, label="1h", step="hour", stepmode="backward"),
                 dict(count=2, label="2h", step="hour", stepmode="backward"),
                 dict(step="all")
         ))})
-        #print(f'TSL Fig is {fig}')
         return fig
     else:
         return {}
 
-def run_webserver():
-    print('Spawing Webserver...')
-    app.run_server(debug=True, port=8080, use_reloader=True)
-
-def run_ws():
-    global live_price
-    with websockets.connect(f"wss://ws.twelvedata.com/v1/quotes/price?apikey={config.API_KEY}") as websocket:
-        subscribe = json.dumps({
-          "action": "subscribe", 
-          "params": {
-            "symbols": f'{ticker}'
-          }
-        })
-        print(subscribe)
-        websocket.send(subscribe)
-
-        res = json.loads(websocket.recv())
-        print(f'WS Message is {message}')
-        if 'price' in res:
-            live_price = res['price']
-            print(f'Latest Price is {live_price}')
-            buildCandleDataFrame(live_price)
-
 if __name__ == '__main__':
-    global td
-    global ws
-    td = TDClient(apikey=config.API_KEY)
-    #websocket.enableTrace(True)
-#    ws = websocket.WebSocketApp(f"wss://ws.twelvedata.com/v1/quotes/price?apikey={config.API_KEY}",
-#                          on_open = on_open,
-#                          on_message = on_message,
-#                          on_error = on_error,
-#                          on_close = on_close)
-#    ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
-    ws_task = Thread(target=run_ws)
-    webserver_task = Thread(target=run_webserver)
-    ws_task.start()
-    #webserver_task.start()
+    app.run_server(debug=True, port=8080, use_reloader=True)
 
