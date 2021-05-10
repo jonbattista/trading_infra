@@ -222,7 +222,7 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
                     log.info(f'Modified Buy Order ID: {order_id}')
                 except tradeapi.rest.APIError as err:
                     log.error(f'Error modifying buy order: {err.response.content}')
-                    return err
+                    raise
 
                 log.info(f'Buy Limit Price was changed from {limit_price} to {new_limit_price}')
                 limit_price = new_limit_price
@@ -254,7 +254,7 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
                     log.info(f'Modified Sell Order ID: {order_id}')
                 except tradeapi.rest.APIError as err:
                     log.error(f'Error modifying sell order: {err.response.content}')
-                    return err
+                    raise
 
                 log.info(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
                 limit_price = new_limit_price
