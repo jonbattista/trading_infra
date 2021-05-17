@@ -1,0 +1,9 @@
+Flask
+alpaca_trade_api
+sendgrid
+waitress
+discord.py
+pymongo
+apscheduler
+python-dotenv
+twelvedata

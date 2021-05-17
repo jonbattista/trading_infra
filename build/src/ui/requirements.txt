@@ -1,0 +1,24 @@
+ requests
+ json
+ time
+ asyncio
+ pandas
+ numpy
+ plotly.graph_objs
+ datetime  datetime
+ pytz  timezone
+ pytz
+ dash
+ dash_core_components
+ dash_html_components
+ config
+ dash.dependencies
+ sqlalchemy
+ pymysql
+ logging
+ sys
+ mysql
+ discord
+ pandas
+ dotenv
+ dash_auth

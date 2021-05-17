@@ -1,0 +1,6 @@
+websocket
+sqlalchemy
+pymysql
+pandas
+requests
+apscheduler
