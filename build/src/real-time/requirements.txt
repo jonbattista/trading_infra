@@ -3,4 +3,5 @@ sqlalchemy
 pandas
 datetime
 pymysql
-websockets
+websocket-client
+python-dotenv

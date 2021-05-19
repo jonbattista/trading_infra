@@ -18,6 +18,9 @@ load_dotenv()
 DB_PASS = os.environ.get("DB_PASS")
 FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
 
+#host = "mysql-server.default.svc.cluster.local"
+host = "127.0.0.1"
+
 ticker = "BINANCE:BTCUSDT"
 database = "trades"
 
@@ -41,9 +44,10 @@ def checkTables(table, cursor):
 
 def buildCandleDataFrame(live):
     global ticker
+    global host
 
-    sqlEngine = create_engine(f'mysql+pymysql://root:{DB_PASS}@127.0.0.1/{database}', pool_recycle=3600)
-    connection = pymysql.connect(host='localhost',
+    sqlEngine = create_engine(f'mysql+pymysql://root:{DB_PASS}@{host}/{database}', pool_recycle=3600)
+    connection = pymysql.connect(host=host,
                          user='root',
                          password=DB_PASS,
                          database=database,
@@ -155,21 +159,25 @@ def buildCandleDataFrame(live):
                                 cursor.execute(sql)
                             except Exception as e:
                                 print(e)
+                        try:
+                            new_table = pd.read_sql(f"SELECT * FROM `{ticker}`", dbConnection);
+                        except Exception as e:
+                            print(e)
+
+                        pd.set_option('display.expand_frame_repr', False)
+                        
+                        print(f"Updated Table is {new_table}")
+                        dbConnection.close()
+                        cursor.close()        
 
                     else:
                         log.info(f"Table {ticker} is empty")
-
-
-                    try:
-                        new_table = pd.read_sql(f"SELECT * FROM `{ticker}`", dbConnection);
-                    except Exception as e:
-                        print(e)
-
-                    pd.set_option('display.expand_frame_repr', False)
-                    
-                    print(f"Updated Table is {new_table}")
+                        dbConnection.close()
+                        cursor.close()
                 else:
                     log.info(f"Table {ticker} does not exist!")
+                    dbConnection.close()
+                    cursor.close()
 
 def checkTables(table,cursor):
     stmt = f"SHOW TABLES LIKE '{table}'"
@@ -184,9 +192,10 @@ def checkTables(table,cursor):
 def updateLatestPrice(price):
     global ticker
     global database
+    global host
 
     table = f"{ticker}-live"
-    connection = pymysql.connect(host='localhost',
+    connection = pymysql.connect(host=host,
                              user='root',
                              password=DB_PASS,
                              database=database,

@@ -28,6 +28,8 @@ load_dotenv()
 DB_PASS = os.environ.get("DB_PASS")
 FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
 
+#host = "mysql-server.default.svc.cluster.local"
+host = "127.0.0.1"
 now = datetime.now(timezone('UTC'))
 
 ticker = 'BINANCE:BTCUSDT'
@@ -51,7 +53,7 @@ sup0 = 0
 sup1 = 0
 res0 = 0
 res1 = 0
-
+signal = None
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
 log.propagate = False
@@ -73,6 +75,301 @@ def sendDiscordMessage(message):
         webhook = Webhook.from_url(debug_url, adapter=RequestsWebhookAdapter())
         webhook.send(message)
 
+def dropTables():
+    global ticker
+    global database
+    global host
+    global first_run
+
+    if first_run:
+        first_run = False
+        tables = (f"{ticker}-live",f"{ticker}-avn",f"{ticker}-avd",f"{ticker}-tsl")
+        print(tables)
+        connection = pymysql.connect(host=host,
+                                 user='root',
+                                 password=DB_PASS,
+                                 database=database,
+                                 charset='utf8mb4',
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 autocommit=True)
+        with connection:
+            with connection.cursor() as cursor:
+                for table in tables:
+                    try:
+                        sql = f"DROP TABLE `{table}`;"
+                        res = cursor.execute(sql)
+                        result = cursor._last_executed
+                        log.info(f"Dropped Table: {result}")
+                    except Exception as e:
+                        log.error(f"Drop Table Error: {e}")
+        
+                cursor.close()
+
+def updateAvd(value,timestamp):
+    global ticker
+    global database
+    global host
+
+    kind = "avd"
+
+    keys = ("value","timestamp")
+    table = f"{ticker}-{kind}"
+    connection = pymysql.connect(host=host,
+                             user='root',
+                             password=DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
+    with connection:
+        with connection.cursor() as cursor:
+            if checkTables(table, cursor):
+                try:
+                    sql = f"INSERT INTO `{table}` ({keys[0]},{keys[1]}) VALUES ({value},'{timestamp}');"
+                    res = cursor.execute(sql)
+                    result = cursor._last_executed
+                    log.info(f"Update: {result}")
+                except Exception as e:
+                    log.error(f"Update AVD Error: {e}")
+                finally:
+                    cursor.close()
+            else:
+                try:
+                    sql = f"CREATE TABLE IF NOT EXISTS `{table}` ({keys[0]} DOUBLE,{keys[1]} DATETIME);"
+                    cursor.execute(sql)
+                    result = cursor._last_executed
+                    print(f"Create: {result}")
+                except Exception as e:
+                    print(f"Create AVD Error: {e}")
+
+                try:
+                    sql = f"INSERT INTO `{table}`({keys[0]},{keys[1]}) values ({value},'{timestamp}')"
+                    cursor.execute(sql)
+                    result = cursor._last_executed
+                    print(result)
+                except Exception as e:
+                    print(f"Insert AVD Error: {e}")
+                finally:
+                    cursor.close()
+def fetchAvd():
+    global ticker
+    global database
+    global host
+
+    avd = {}
+    key = "avd"
+    table = f"{ticker}-{key}"
+    connection = pymysql.connect(host=host,
+                             user='root',
+                             password=DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
+    with connection:
+        with connection.cursor() as cursor:
+            if checkTables(table, cursor):
+                log.info("Fetching AVD")
+                try:
+                    sql = f"SELECT (value) FROM `{table}`"
+                    print(sql)
+                    cursor.execute(sql)
+                    values = [item['value'] for item in cursor.fetchall()]
+                    log.info(f"Fetched: {values}")
+                    avd['values'] = values
+                except Exception as e:
+                    log.error(f"Fetch AVD Error: {e}")
+
+                try:
+                    sql = f"SELECT (timestamp) FROM `{table}`"
+                    print(sql)
+                    cursor.execute(sql)
+                    timestamps = [item['timestamp'] for item in cursor.fetchall()]
+                    log.info(f"Fetched: {timestamps}")
+                    avd['timestamps'] = timestamps
+                except Exception as e:
+                    log.error(f"Fetch AVD Error: {e}")
+            print(avd)
+            cursor.close()
+            return avd
+
+def updateAvn(value,timestamp):
+    global ticker
+    global database
+    global host
+
+    kind = "avn"
+
+    keys = ("value","timestamp")
+    table = f"{ticker}-{kind}"
+    connection = pymysql.connect(host=host,
+                             user='root',
+                             password=DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
+    with connection:
+        with connection.cursor() as cursor:
+            if checkTables(table, cursor) and avn is not None:
+                try:
+                    sql = f"INSERT INTO `{table}` ({keys[0]},{keys[1]}) VALUES ({value},'{timestamp}');"
+                    res = cursor.execute(sql)
+                    result = cursor._last_executed
+                    log.info(f"Update: {result}")
+                except Exception as e:
+                    log.error(f"Update AVN Error: {e}")
+                finally:
+                    cursor.close()
+            else:
+                try:
+                    sql = f"CREATE TABLE IF NOT EXISTS `{table}` ({keys[0]} DOUBLE,{keys[1]} DATETIME);"
+                    cursor.execute(sql)
+                    result = cursor._last_executed
+                    print(f"Create: {result}")
+                except Exception as e:
+                    print(f"Create AVN Error: {e}")
+                if avn is not None:
+                    try:
+                        sql = f"INSERT INTO `{table}` ({keys[0]},{keys[1]}) VALUES ({value},'{timestamp}');"
+                        print(sql)
+                        cursor.execute(sql)
+                        result = cursor._last_executed
+                        print(result)
+                    except Exception as e:
+                        print(f"Insert AVN Error: {e}")
+                    finally:
+                        cursor.close()
+def fetchAvn():
+    global ticker
+    global database
+    global host
+
+    avn = {}
+    key = "avn"
+    table = f"{ticker}-{key}"
+    connection = pymysql.connect(host=host,
+                             user='root',
+                             password=DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
+    with connection:
+        with connection.cursor() as cursor:
+            if checkTables(table, cursor):
+                log.info("Fetching AVN")
+                try:
+                    sql = f"SELECT (value) FROM `{table}`"
+                    print(sql)
+                    cursor.execute(sql)
+                    values = [item['value'] for item in cursor.fetchall()]
+                    log.info(f"Fetched: {values}")
+                    avn['values'] = values
+                except Exception as e:
+                    log.error(f"Fetch AVN Error: {e}")
+
+                try:
+                    sql = f"SELECT (timestamp) FROM `{table}`"
+                    print(sql)
+                    cursor.execute(sql)
+                    timestamps = [item['timestamp'] for item in cursor.fetchall()]
+                    log.info(f"Fetched: {timestamps}")
+                    avn['timestamps'] = timestamps
+                except Exception as e:
+                    log.error(f"Fetch AVN Error: {e}")
+            print(avn)
+            cursor.close()
+            return avn
+
+def updateTsl(value,timestamp):
+    global ticker
+    global database
+    global host
+
+    kind = "tsl"
+    keys = ("value","timestamp")
+    table = f"{ticker}-{kind}"
+    connection = pymysql.connect(host=host,
+                             user='root',
+                             password=DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
+    with connection:
+        with connection.cursor() as cursor:
+            if checkTables(table, cursor):
+                try:
+                    sql = f"INSERT INTO `{table}` ({keys[0]},{keys[1]}) VALUES ({value},'{timestamp}');"
+                    res = cursor.execute(sql)
+                    result = cursor._last_executed
+                    log.info(f"Update: {result}")
+                except Exception as e:
+                    log.error(f"Update TSL Error: {e}")
+                finally:
+                    cursor.close()
+            else:
+                try:
+                    sql = f"CREATE TABLE IF NOT EXISTS `{table}` ({keys[0]} DOUBLE,{keys[1]} DATETIME);"
+                    cursor.execute(sql)
+                    result = cursor._last_executed
+                    print(f"Create: {result}")
+                except Exception as e:
+                    print(f"Create TSL Error: {e}")
+
+                try:
+                    sql = f"INSERT INTO `{table}`({keys[0]},{keys[1]}) values ({value},'{timestamp}')"
+                    cursor.execute(sql)
+                    result = cursor._last_executed
+                    print(result)
+                except Exception as e:
+                    print(f"Insert TSL Error: {e}")
+                finally:
+                    cursor.close()
+def fetchTsl():
+    global ticker
+    global database
+    global host
+
+    tsl = {}
+    key = "tsl"
+    table = f"{ticker}-{key}"
+    connection = pymysql.connect(host=host,
+                             user='root',
+                             password=DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
+    with connection:
+        with connection.cursor() as cursor:
+            if checkTables(table, cursor):
+                log.info("Fetching TSL")
+                try:
+                    sql = f"SELECT (value) FROM `{table}`"
+                    print(sql)
+                    cursor.execute(sql)
+                    values = [item['value'] for item in cursor.fetchall()]
+                    log.info(f"Fetched: {values}")
+                    tsl['values'] = values
+                except Exception as e:
+                    log.error(f"Fetch TSL Error: {e}")
+
+                try:
+                    sql = f"SELECT (timestamp) FROM `{table}`"
+                    print(sql)
+                    cursor.execute(sql)
+                    timestamps = [item['timestamp'] for item in cursor.fetchall()]
+                    log.info(f"Fetched: {timestamps}")
+                    tsl['timestamps'] = timestamps
+                except Exception as e:
+                    log.error(f"Fetch TSL Error: {e}")
+            
+            print(f"TSL is {tsl}")
+            cursor.close()
+            return tsl
+
 def checkTables(table, cursor):
     stmt = "SHOW TABLES LIKE '%s' "% ('%'+str(table)+'%')
     cursor.execute(stmt)
@@ -80,18 +377,40 @@ def checkTables(table, cursor):
     return result
 
 def calcTsl(data):
+    global previous_avd
     global sup0
     global sup1
     global res0
     global res1
-    if data is not None:
-        live = data["c"].iloc[-1]
+    global live
+    global avn
+    global avd
+    global signal
 
-        print(f"Last Price is {live}")
-        global avn
-        global previous_avd
+    fig = go.Figure()
 
-        print(data)
+    table = f"{ticker}-live"
+    connection = pymysql.connect(host=host,
+                             user='root',
+                             password=DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
+
+    connection.autocommit(True)
+
+    with connection:
+        with connection.cursor() as cursor:
+            if checkTables(table, cursor):
+                sql = f"SELECT * FROM `{table}`"
+                cursor.execute(sql)
+                res = cursor.fetchone()
+                live = res['price']
+
+    if data is not None and live is not None:
+        print(f'Live Price is {live}')
+        print(f'TSL New Data is {data}')
         now_utc = pytz.utc.localize(datetime.utcnow())
         now_est = now_utc.astimezone(pytz.timezone("America/New_York"))
         now_est = now_est.strftime('%Y-%m-%d %H:%M:%S.%f')#
@@ -111,11 +430,6 @@ def calcTsl(data):
         sup0 = float(min(low3H0))  # Min of prior including active [0]
         sup1 = float(min(low3H1))
 
-        print(f'Resistance 0 is {res0}')
-        print(f'Resistance 1 is {res1}')
-        print(f'Support 0 is {sup0}')
-        print(f'Support 1 is {sup1}')
-
         # AVD - Checks is live value is below or above prior candle
         # support/resistance
         if live > res1:
@@ -128,10 +442,15 @@ def calcTsl(data):
         if avd != previous_avd:
             #sendDiscordMessage(f'AVD changed from {previous_avd} to {avd}!')
             previous_avd = avd
+        print(f'AVD is {avd}')
+        if avd is not None:
+            updateAvd(avd,now_est)
 
         # AVN  - AVD value of last non-zero condition stored.
         if avd != 0:
             avn = avd
+            updateAvn(avn,now_est)
+        print(f'AVN is {avn}')
 
         # TSL line
         if avn == 1:
@@ -139,24 +458,24 @@ def calcTsl(data):
         else:
             tsl = res0
 
-        print(f'AVD is {avd}')
-        print(f'AVN is {avn}')
         print(f'TSL is {tsl}')
-        tsl_array.append(tsl)
-        print(tsl_array)
-        #print(f'Last Price is {live}')
+        if tsl is not None:
+            updateTsl(tsl,now_est)
 
         close_value = data.c.tail(1).iloc[0]
-        close = float(close_value)#
+        close = float(close_value)
+
         if live > tsl and live > close:
             Buy = True  #Crossover of live price over tsl and higher than last candle close
             print(f'Crossover Buy is True')
+            signal = 'Buy'
         else:
             Buy = False
             print(f'Crossover Buy is False')
         if live < tsl and live < close:
             Sell = True #Crossunder of live price under tsl and lower than last candle close
             print(f'Crossover Sell is True')
+            signal = 'Sell'
         else:
             Sell = False
             print(f'Crossover Sell is False')
@@ -174,6 +493,8 @@ def fetchLastCandles(dbConnection):
 
 app = dash.Dash(__name__,suppress_callback_exceptions=True)
 
+server = app.server
+
 auth = dash_auth.BasicAuth(
     app,
     VALID_USERNAME_PASSWORD_PAIRS
@@ -189,6 +510,9 @@ def serve_layout():
             ], className='six columns'),
             html.Div([
                 dcc.Graph(id = 'avn'),
+            ], className='six columns'),
+            html.Div([
+                dcc.Graph(id = 'avd'),
             ], className='six columns')
         ], className='row'),
 
@@ -210,20 +534,24 @@ def update_candles(n):
     global old_fig
     global database
     global new_data
+    global host
+    global DB_PASS
 
+    print('meow')
     try:
-        sqlEngine = create_engine(f'mysql+pymysql://root:{DB_PASS}@127.0.0.1/{database}', pool_recycle=3600)
+        sqlEngine = create_engine(f'mysql+pymysql://root:{DB_PASS}@{host}/{database}', pool_recycle=3600)
     except Exception as e:
-        print(e)
+        print(f"SQL Engine Error: {e}")
 
     connection = sqlEngine.raw_connection()
     cursor = connection.cursor()
     dbConnection = sqlEngine.connect()
 
     fig = go.Figure()
-
+    print('woof')
     new_data = fetchLastCandles(dbConnection)
     
+    log.info(new_data)
     if new_data is not None:
         calcTsl(new_data)
 
@@ -262,107 +590,14 @@ def update_candles(n):
     [Input('interval-component', 'n_intervals')]
 )
 def update_tsl(n):
-    global new_data
-    global tsl_list
-    global date_list
-    global live_price
-    global res0
-    global res1
-    global sup0
-    global sup1
-    global avn
-    global avd
-
-    table = f"{ticker}-live"
-    connection = pymysql.connect(host='localhost',
-                             user='root',
-                             password=DB_PASS,
-                             database=database,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor,
-                             autocommit=True)
-
-    connection.autocommit(True)
-
-    with connection:
-        with connection.cursor() as cursor:
-            if checkTables(table, cursor):
-                sql = f"SELECT * FROM `{table}`"
-                cursor.execute(sql)
-                res = cursor.fetchone()
-                live_price = res['price']
-
     fig = go.Figure()
-    print(f'Live Price is {live_price}')
-    print(f'TSL New Data is {new_data}')
 
-    if new_data is not None:
-        now_utc = pytz.utc.localize(datetime.utcnow())
-        now_est = now_utc.astimezone(pytz.timezone("America/New_York"))
-        now_est = now_est.strftime('%Y-%m-%d %H:%M:%S.%f')#
-        high = new_data.h
-        #print(high)#
-        last3H0 = high.tail(3)  # last 3 including active candle [0]
-        last3H1 = high.tail(4).head(3)  # last 3 not including active [1]
-        print(last3H0)
-        print(last3H1)
-        low = new_data.l
-        # print(low)#
-        low3H0 = low.tail(3)  # last 3 including active candle [0]
-        low3H1 = low.tail(4).head(3)  # last 3 not including active [1]
-        # print(low3H1)##
-        res0 = float(max(last3H0))  # MAX of prior including active [0]
-        res1 = float(max(last3H1))#
-        sup0 = float(min(low3H0))  # Min of prior including active [0]
-        sup1 = float(min(low3H1))
+    tsl = fetchTsl()
 
-        # print(f'Resistance 0 is {res0}')
-        # print(f'Resistance 1 is {res1}')
-        # print(f'Support 0 is {sup0}')
-        # print(f'Support 1 is {sup1}')#
-        # AVD - Checks is live value is below or above prior candle
-        # support/resistance
-        if live_price > res1:
-            avd = 1
-        elif live_price < sup1:
-            avd = -1
-        else:
-            avd = 0#
-        # AVN  - AVD value of last non-zero condition stored.
-        if avd != 0:
-            avn = avd
-            #prior_avd = avd
-        else:
-            #avn=prior_avd
-            avn = 0#
-        # TSL line
-        if avn == 1:
-            tsl = sup0
-        else:
-            tsl = res0
-        avn_list.append(avn)
-        print(f"AVN List is {avn_list}")
-        # print(f'AVD is {avd}')
-        # print(f'AVN is {avn}')
-        # print(f'TSL is {tsl}')
-        # print(f'Last Price is {live_price}') #
-        close_value = new_data.c.tail(1).iloc[0]
-        close = float(close_value)
-
-        if live_price > tsl and live_price > close:
-            Buy = True  #Crossover of live price over tsl and higher than last candle close
-        else:
-            Buy = False#
-        if live_price < tsl and live_price < close:
-            Sell = True #Crossunder of live price under tsl and lower than last candle close
-        else:
-            Sell = False#
-        #print(now_est)
-        date_list.append(now_est)
-        tsl_list.append(tsl)
+    if tsl is not None and 'timestamps' in tsl and 'values' in tsl:
         tsl = go.Scatter(
-                x=date_list,
-                y=tsl_list,
+                x=tsl['timestamps'],
+                y=tsl['values'],
                 mode='lines'
             )
 
@@ -393,15 +628,14 @@ def update_tsl(n):
     [Input('interval-component', 'n_intervals')]
 )
 def update_avn(n):
-    global avn_list
-    global date_list
+    fig = go.Figure()
 
-    if avn_list is not None and date_list is not None:
-        fig = go.Figure()
+    avn = fetchAvn()
 
+    if avn is not None and 'timestamps' in avn and 'values' in avn:
         avn = go.Scatter(
-            x=date_list,
-            y=avn_list,
+            x=avn["timestamps"],
+            y=avn["values"],
             mode='lines'
         )
 
@@ -410,6 +644,42 @@ def update_avn(n):
         fig.update_layout(
             title='AVN',
             yaxis_title='AVN'
+        )
+
+        fig.update_xaxes(
+            rangeslider_visible=True,
+            rangeselector={'buttons': list((
+                dict(count=15, label="15m", step="minute", stepmode="backward"),
+                dict(count=30, label="30m", step="minute", stepmode="backward"),
+                dict(count=1, label="1h", step="hour", stepmode="backward"),
+                dict(count=2, label="2h", step="hour", stepmode="backward"),
+                dict(step="all")
+        ))})
+        return fig
+    else:
+        return {}
+
+@app.callback(
+    Output('avd', 'figure'),
+    [Input('interval-component', 'n_intervals')]
+)
+def update_avd(n):
+    fig = go.Figure()
+
+    avd = fetchAvd()
+    print(avd)
+    if avd is not None and 'timestamps' in avd and 'values' in avd:
+        avd = go.Scatter(
+            x=avd["timestamps"],
+            y=avd["values"],
+            mode='lines'
+        )
+
+        fig.add_trace(avd)
+
+        fig.update_layout(
+            title='AVD',
+            yaxis_title='AVD'
         )
 
         fig.update_xaxes(
@@ -437,8 +707,10 @@ def update_metrics(n):
     global live_price
     global avn
     global avd
+    global signal
 
     return [
+        html.H1(f'Signal is {signal}', style = {'margin':40}),
         html.H1(f'AVN is {avn}', style = {'margin':40}),
         html.H1(f'AVD is {avd}', style = {'margin':40}),
         html.H1(f'Last Price is ${live_price}', style = {'margin':40}),
@@ -449,5 +721,6 @@ def update_metrics(n):
     ]
 
 if __name__ == '__main__':
+    dropTables()
     app.run_server(debug=True, port=8080, use_reloader=True)
 

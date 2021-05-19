@@ -4,3 +4,4 @@ pymysql
 pandas
 requests
 apscheduler
+python-dotenv
