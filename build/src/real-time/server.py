@@ -12,16 +12,20 @@ from sys import stdout
 import pymysql.cursors
 import os
 from dotenv import load_dotenv
+from pytz import timezone, utc
+from time import sleep
 
 load_dotenv()
 
 DB_PASS = os.environ.get("DB_PASS")
 FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
 
-#host = "mysql-server.default.svc.cluster.local"
-host = "127.0.0.1"
+DB_HOST = os.environ.get("DB_HOST")
 
-ticker = "BINANCE:BTCUSDT"
+if DB_HOST is None:
+    DB_HOST = "127.0.0.1"
+
+ticker = None
 database = "trades"
 
 first_run = True
@@ -32,22 +36,27 @@ log.propagate = False
 consoleHandler = logging.StreamHandler(stdout)
 log.addHandler(consoleHandler)
 
-def checkTables(table, cursor):
+def checkTableExists(table, cursor):
     try:
-        sql = f"SELECT COUNT(*) FROM `{ticker}`"
+        sql = f"SELECT COUNT(*) FROM `{table}`"
         cursor.execute(sql)
         count = cursor.fetchone()
     except Exception as e:
-        count = None     
-    
-    return count
+        count = None
+
+    #log.info(f"Table Count is {count}")
+    if count is not None and count['COUNT(*)'] > 0:
+        return True
+    else:
+        return False
 
 def buildCandleDataFrame(live):
     global ticker
-    global host
+    global DB_HOST
+    global DB_PASS
 
-    sqlEngine = create_engine(f'mysql+pymysql://root:{DB_PASS}@{host}/{database}', pool_recycle=3600)
-    connection = pymysql.connect(host=host,
+    sqlEngine = create_engine(f'mysql+pymysql://root:{DB_PASS}@{DB_HOST}/{database}', pool_recycle=3600)
+    connection = pymysql.connect(host=DB_HOST,
                          user='root',
                          password=DB_PASS,
                          database=database,
@@ -55,187 +64,208 @@ def buildCandleDataFrame(live):
                          cursorclass=pymysql.cursors.DictCursor,
                          autocommit=True)
 
-    with connection:
-        with connection.cursor() as cursor:
-            with sqlEngine.connect() as dbConnection:
-                count = checkTables(ticker,cursor)
-                print(count)
-                if count is not None and count is True:
-                    try:
-                        data = pd.read_sql(f"SELECT * FROM `{ticker}`", dbConnection);
-                    except Exception as e:
-                        raise(e)
+    with connection.cursor() as cursor:
+        with sqlEngine.connect() as dbConnection:
+            if checkTableExists(ticker,cursor):
+                try:
+                    data = pd.read_sql(f"SELECT * FROM `{ticker}`", dbConnection);
+                except Exception as e:
+                    raise(e)
 
-                    df_len = len(data.index)
-                    print(df_len)
-                    print(f"Dataframe Size is {df_len}")
-                    if df_len > 0:
-                        index = df_len - 1
-                        open_value = round(data['o'].iloc[-1], 2)
-                        high_value = round(data['h'].iloc[-1], 2)
-                        low_value = round(data['l'].iloc[-1], 2)
-                        close_value = round(data['c'].iloc[-1], 2)
+                df_len = len(data.index) 
+                #print(df_len)
+                print(data)
+                print(f"Dataframe Size is {df_len}")
 
-                        # Set the high value if it is greater than the open
-                        if live > high_value:
-                            print(f'Updating High Value from {high_value} to {live}')
-                            high_value = live
+                if len(data.index) > 0:
 
-                        # Set the low value if it is less than the open
-                        if live < low_value:
-                            print(f'Updating Low Value from {low_value} to {live}')
-                            low_value = live
+                    #while len(data.index) > 5:
+                    #    data = data.drop(data.index[0])
 
-                        # After we have receieved any value, set close to current value
-                        if live != close_value:
-                            print(f'Updating Close Value from {close_value} to {live}')
-                            close_value = live
+                    print(data)
+                    index = df_len - 1
+                    open_value = round(data['o'].iloc[-1], 2)
+                    high_value = round(data['h'].iloc[-1], 2)
+                    low_value = round(data['l'].iloc[-1], 2)
+                    close_value = round(data['c'].iloc[-1], 2)
 
-                        #todays_date = datetime.now()
-                        #index = pd.date_range(todays_date, periods=1, freq='D')
+                    # Set the high value if it is greater than the open
+                    if live > high_value:
+                        print(f'Updating High Value from {high_value} to {live}')
+                        high_value = live
 
-                        #input = {'open':open_value, 'high':high_value,'low':low_value,'volume':0,'close':close_value}
-                        data.at[index,'o']=open_value
-                        data.at[index,'h']=high_value
-                        data.at[index,'l']=low_value
-                        data.at[index,'c']=close_value
-                        data.at[index,'v']=0
+                    # Set the low value if it is less than the open
+                    if live < low_value:
+                        print(f'Updating Low Value from {low_value} to {live}')
+                        low_value = live
 
-                        #new_candle = pd.DataFrame(input, index=index)
-                        #now = int(datetime.now().timestamp())
-                        date = datetime.now()
-                        current_minute = date.strftime('%Y-%m-%d %H:%M:00')
-                        data.at[index,'t']=current_minute
+                    # After we have receieved any value, set close to current value
+                    if live != close_value:
+                        print(f'Updating Close Value from {close_value} to {live}')
+                        close_value = live
 
-                        #print(f'Current Minute is {current_minute}')
+                    tz = timezone('US/Eastern')
+                    #date = datetime.now(tz)
+                    now_utc = utc.localize(datetime.utcnow())
+                    #print(now_utc)
+                    now_est = now_utc.astimezone(tz)
+                    #print(now_est)
 
-                        #new_candle.index.values[0] = pd.Timestamp(current_minute)
-                        #print(f'New Dataframe is {data}')
-                        #index_len = len(data.index.tolist())
+                    previous_time = data.at[index - 1,'t'].to_pydatetime()
+                    print(previous_time)
+                    previous_minute = previous_time.minute
+                    current_minute = now_est.minute
 
-                        #if index_len > 4 :
-                            #stamp = data.index.tolist()
-                            #index_stamp = stamp[len(stamp)-1]
+                    print(f"Previous Minute is {previous_minute}")
+                    print(f"Current minute {current_minute}")
 
-                            #removed = data.drop(pd.Timestamp(index_stamp))
-                            #new_data = removed.append(new_candle)
-                            #print(new_data)
-                            #table  = new_data.to_sql(ticker, dbConnection, if_exists='replace');
-                        #else:
-                            #new_data = data.append(new_candle)
-                            #print(new_data)
-                        cols = "`,`".join([str(i) for i in data.columns.tolist()])
-                        print(f"Columns: {cols}")
+                    current_minute_string = now_est.strftime('%Y-%m-%d %H:%M:00')
 
-                        # Insert DataFrame recrds one by one.
-                        for i,row in data.iterrows():
-                            print(f"index: {i}")
-                            print(f"Row: {row}")
-                            #values = "`,`".join([str(i) for i in row])
-                            #print(values)
-                            keys = ""
-#                            i = 0
-#                            while i < len(tuple(row)):
-#                                v = tuple(row)[i]
-#                                print(v)
-#                                while i < len(data.columns.tolist()):
-#                                    k = data.columns.tolist()[i]
-#                                    keys = keys + f"{k}={v},"
-#                                    i = i + 1
-                            for k, v in zip(data.columns.tolist(), tuple(row)):
-                                print(k)
-                                print(v)
-                                if k != "index":
-                                    keys = keys + f"`{k}` = '{v}', "
+#                    if current_minute > previous_minute:
+#                        i = df_len
+#                        #new_row = pd.DataFrame([(i, close_value, high_value, low_value, open_value, 'ok', current_minute_string, 0)], index=[i], columns=('index','c','h','l','o','s','t','v'))
+#                        #print(new_row)
+#                        #data = data.append(new_row)
+#                        #print(data)
+#                        #data = data.drop(data.index[0])
+#                        #print(data)
+#                        keys = f"`index`= {i}, `c` = {close_value}, `h` = {high_value}, `l` = {low_value}, `o` = {open_value}, `s` = 'ok', `t` = '{current_minute_string}', `v` = 0"
+#                        try:
+#                            sql = f"INSERT INTO `{ticker}` SET {keys}"
+#                            print(sql)
+#                            #print(tuple(row))
+#                            cursor.execute(sql)
+#                            print(f"Rows Modified = {cursor.rowcount}")
+#                        except Exception as e:
+#                            log.info(e)
+#                    else:
+                    data.at[index,'index']=index
+                    data.at[index,'o']=open_value
+                    data.at[index,'h']=high_value
+                    data.at[index,'l']=low_value
+                    data.at[index,'c']=close_value
+                    data.at[index,'v']=0
+                    data.at[index,'t']=current_minute_string
 
-                            keys = keys[:-2]
+                    log.info(data)
+                    cols = "`,`".join([str(i) for i in data.columns.tolist()])
+                    #print(f"Columns: {cols}")
 
-                            print(f"Keys {keys}")
-                            try:
-                                #sql = f"UPDATE INTO `{ticker}` (`" +cols + "`) VALUES (" + "%s,"*(len(row)-1) + "%s)"
-                                sql = f"UPDATE `{ticker}` SET {keys} WHERE `index` = {i}"
-                                print(sql)
-                                print(tuple(row))
-                                cursor.execute(sql)
-                            except Exception as e:
-                                print(e)
+                    # Insert DataFrame recrds one by one.
+                    for i,row in data.iterrows():
+                        #print(f"index: {i}")
+                        #print(f"Row: {row}")
+                        #values = "`,`".join([str(i) for i in row])
+                        #print(values)
+                        keys = ""
+
+                        for k, v in zip(data.columns.tolist(), tuple(row)):
+                            #print(k)
+                            #print(v)
+                            if k != "index":
+                                keys = keys + f"`{k}` = '{v}', "
+
+                        keys = keys[:-2]
+
+                        print(f"Keys {keys}")
                         try:
-                            new_table = pd.read_sql(f"SELECT * FROM `{ticker}`", dbConnection);
+                            sql = f"UPDATE `{ticker}` SET {keys} WHERE `index` = {i}"
+                            #print(sql)
+                            #print(tuple(row))
+                            cursor.execute(sql)
+                            print(f"Rows Modified = {cursor.rowcount}")
                         except Exception as e:
-                            print(e)
+                            log.info(e)
+                    try:
+                        new_table = pd.read_sql(f"SELECT * FROM `{ticker}`", dbConnection);
+                    except Exception as e:
+                        log.info(e)
 
-                        pd.set_option('display.expand_frame_repr', False)
-                        
-                        print(f"Updated Table is {new_table}")
-                        dbConnection.close()
-                        cursor.close()        
-
-                    else:
-                        log.info(f"Table {ticker} is empty")
-                        dbConnection.close()
-                        cursor.close()
-                else:
-                    log.info(f"Table {ticker} does not exist!")
-                    dbConnection.close()
+                    pd.set_option('display.expand_frame_repr', False)
+                    
+                    log.info(f"Updated Table is {new_table}")
                     cursor.close()
 
-def checkTables(table,cursor):
-    stmt = f"SHOW TABLES LIKE '{table}'"
-    cursor.execute(stmt)
-    result = cursor.fetchone()
-    print(result)
-    if result:
-        return True
-    else:
-        return False
+                else:
+                    log.info(f"Table {ticker} is empty")
+                    cursor.close()
+            else:
+                log.info(f"Table {ticker} does not exist!")
+                cursor.close()
 
 def updateLatestPrice(price):
     global ticker
     global database
-    global host
+    global DB_HOST
+    global DB_PASS
 
     table = f"{ticker}-live"
-    connection = pymysql.connect(host=host,
+    connection = pymysql.connect(host=DB_HOST,
                              user='root',
                              password=DB_PASS,
                              database=database,
                              charset='utf8mb4',
                              cursorclass=pymysql.cursors.DictCursor,
                              autocommit=True)
-    with connection:
-        with connection.cursor() as cursor:
-            if checkTables(table, cursor):
-                try:
-                    sql = f"INSERT INTO `{table}` (id,price) VALUES (1,{price}) ON DUPLICATE KEY UPDATE price={price};"
-                    res = cursor.execute(sql)
-                    result = cursor._last_executed
-                    log.info(f"Update: {result}")
-                except Exception as e:
-                    log.error(f"Update Error: {e}")
-                finally:
-                    cursor.close()
-            else:
-                try:
-                    sql = f"CREATE TABLE IF NOT EXISTS `{table}` (id INT PRIMARY KEY, price FLOAT);"
-                    cursor.execute(sql)
-                    result = cursor._last_executed
-                    print(f"Create: {result}")
-                except Exception as e:
-                    print(f"Create Error: {e}")
 
-                try:
-                    sql = f"INSERT INTO `{table}`(id,price) values (1,{price})"
-                    cursor.execute(sql)
-                    result = cursor._last_executed
-                    print(result)
-                except Exception as e:
-                    print(f"Insert Error: {e}")
-                finally:
-                    cursor.close()
+    with connection.cursor() as cursor:
+        if checkTableExists(table,cursor):
+            try:
+                sql = f"UPDATE `{table}` SET `price` = {price} WHERE `index` = 0"
+                print(sql)
+                res = cursor.execute(sql)
+                result = cursor._last_executed
+                log.info(f"Update: {result}")
+            except Exception as e:
+                log.error(f"Update Live Price Error: {e}")
+            finally:
+                cursor.close()
+        else:
+            try:
+                sql = f"CREATE TABLE IF NOT EXISTS `{table}` (`index` INT PRIMARY KEY, price FLOAT);"
+                print(sql)
+                cursor.execute(sql)
+                result = cursor._last_executed
+                print(f"Create: {result}")
+            except Exception as e:
+                print(f"Create Live Price Error: {e}")
 
+            try:
+                sql = f"INSERT INTO `{table}` (`index`,price) values (0,{price})"
+                print(sql)
+                cursor.execute(sql)
+                result = cursor._last_executed
+                print(result)
+            except Exception as e:
+                print(f"Insert Live Price Error: {e}")
+            finally:
+                cursor.close()
+
+def subscribeTicker(ws,ticker):
+    try:
+        ws.send(json.dumps({
+            "type": "subscribe", 
+            "symbol": f'{ticker}'
+        }))
+        log.info(f"Subscribed to {ticker}")
+    except Exception as e:
+        log.error(e)
+
+def unsubscribeTicker(ws,ticker):
+    try:
+        ws.send(json.dumps({
+            "type": "unsubscribe", 
+            "symbol": f'{ticker}'
+        }))
+        log.info(f"Unsubscribed to {ticker}")
+    except Exception as e:
+        log.error(e)
 
 def on_message(ws, message):
     global live_price
+    global ticker
+
+    fetchTicker(ws)
 
     res = json.loads(message)
     #print(f'WS Message is {message}')
@@ -250,28 +280,26 @@ def on_message(ws, message):
         except Exception as e:
             log.error(e)
 
+
 def on_error(ws, error):
-    print(error)
+    log.info(error)
 
 def on_close(ws):
-    print("Connection closed")
+    log.info("Connection closed\n")
+    sleep(10)
+    log.info('Reconnecting...')
+    startWebsocket()
 
 def on_open(ws):
     global ticker
 
-    print('Websocket Connection Established')
+    log.info('Websocket Connection Established')
 
-    try:
-        ws.send(json.dumps({
-            "type": "subscribe", 
-            "symbol": f'{ticker}'
-        }))
-    except Exception as e:
-        print(e)
+    fetchTicker(ws)
 
-def main():
-    global td
+    subscribeTicker(ws,ticker)
 
+def startWebsocket(ticker):
     ws = websocket.WebSocketApp(f"wss://ws.finnhub.io?token={FINNHUB_API_KEY}",
                   on_open = on_open,
                   on_message = on_message,
@@ -280,5 +308,75 @@ def main():
 
     ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
 
+def fetchTicker(ws):
+    global ticker
+    global database
+    global DB_HOST
+    global DB_PASS
+
+    old_ticker = ticker
+    #print(f"old_ticker is {old_ticker}")
+    table = f"ticker"
+    connection = pymysql.connect(host=DB_HOST,
+                             user='root',
+                             password=DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
+
+    with connection.cursor() as cursor:
+        if checkTableExists(table, cursor):
+            try:
+                sql = f"SELECT ticker FROM {table};"
+                cursor.execute(sql)
+                res = cursor.fetchone()
+            except Exception as e:
+                log.error(f"Error fetching Ticker: {e}")
+            finally:
+                cursor.close()
+            #log.info(res)
+
+            if ticker is None:
+                ticker = res['ticker']
+                log.info(f"Set Ticker to {ticker}")
+            
+            if res['ticker'] is not None and old_ticker != res['ticker']:
+                ticker = res['ticker']
+                log.info(f"Updated Ticker from {old_ticker} to {ticker}")
+                log.info("Ticker changed. Updating Websocket...")
+                if old_ticker is not None:
+                    unsubscribeTicker(ws, old_ticker)
+                if ticker is not None:
+                    subscribeTicker(ws, ticker)
+            print(f"Ticker is {ticker}")
+        else:
+            try:
+                sql = f"CREATE TABLE IF NOT EXISTS `{table}` (`index` BIGINT,ticker TEXT);"
+                cursor.execute(sql)
+                result = cursor._last_executed
+                print(f"Created: {result}")
+            except Exception as e:
+                print(f"Error createing Ticker Table: {e}")
+
+            try:
+                sql = f"INSERT INTO `{table}` (`index`,ticker) VALUES (0,'{ticker}')"
+                cursor.execute(sql)
+                result = cursor._last_executed
+                print(result)
+            except Exception as e:
+                print(f"Error inserting into Ticker Table: {e}")
+            
+            cursor.close()
+
+def main():
+    global ticker
+
+    startWebsocket(ticker)
+
 if __name__ == '__main__':
-    main()
+    if DB_PASS is not None or FINNHUB_API_KEY is not None:
+        main()
+    else:
+        log.error(f"DB_PASS or FINNHUB_API_KEY is not set!")
+
