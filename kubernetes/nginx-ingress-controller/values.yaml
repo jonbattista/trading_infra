@@ -26,7 +26,7 @@ controller:
   nginxDebug: false
 
   ## The log level of the Ingress Controller.
-  logLevel: 1
+  logLevel: 2
 
   ## A list of custom ports to expose on the NGINX ingress controller pod. Follows the conventional Kubernetes yaml syntax for container ports.
   customPorts: []
@@ -39,7 +39,7 @@ controller:
     tag: "1.11.1"
 
     ## The pull policy for the Ingress controller image.
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
   config:
     ## The name of the ConfigMap used by the Ingress controller.

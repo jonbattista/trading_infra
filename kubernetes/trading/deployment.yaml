@@ -1,0 +1,137 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trading-ui-app-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.battista.dev
+    http:
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: trading-ui-app
+            port:
+              number: 80
+  tls:
+  - hosts:
+      - app.battista.dev
+    secretName: secret-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trading-ui-app
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: trading-ui-app
+  sessionAffinity: None
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-real-time-app-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trading-real-time-app
+  template:
+    metadata:
+      labels:
+        app: trading-real-time-app
+    spec:
+      containers:
+      - name: trading-real-time
+        image: gcr.io/trading-309422/trading-real-time:1.0.0
+        imagePullPolicy: Always
+        env:
+        - name: DB_HOST
+          value: 'mysql-server.default.svc.cluster.local'
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: credentials
+              key: mysql-password
+        - name: FINNHUB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: credentials
+              key: finnhub_api_key
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-historical-app-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trading-historical-app
+  template:
+    metadata:
+      labels:
+        app: trading-historical-app
+    spec:
+      containers:
+      - name: trading-historical
+        image: gcr.io/trading-309422/trading-historical:1.0.0
+        imagePullPolicy: Always
+        env:
+        - name: DB_HOST
+          value: 'mysql-server.default.svc.cluster.local'
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: credentials
+              key: mysql-password
+        - name: FINNHUB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: credentials
+              key: finnhub_api_key
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-ui-app-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trading-ui-app
+  template:
+    metadata:
+      labels:
+        app: trading-ui-app
+    spec:
+      containers:
+      - name: trading-ui
+        image: gcr.io/trading-309422/trading-ui:1.0.0
+        imagePullPolicy: Always
+        env:
+        - name: DB_HOST
+          value: 'mysql-server.default.svc.cluster.local'
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: credentials
+              key: mysql-password
+        - name: FINNHUB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: credentials
+              key: finnhub_api_key
+        ports:
+        - containerPort: 8080
