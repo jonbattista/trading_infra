@@ -34,7 +34,7 @@ now = datetime.now(tz)
 
 ticker = None
 initial_candle = True
-avd = -1
+avd = None
 count = None
 date_list = []
 tsl_list = []
@@ -59,7 +59,7 @@ check_buy_signal = False
 check_sell_signal = False
 buy_signal_flag = False
 sell_signal_flag = False
-signal_count_limit = 10
+signal_count_limit = 2
 
 
 
@@ -105,6 +105,8 @@ def dropTables():
     global DB_PASS
 
     if first_run:
+        avn = None
+        avd = None
         first_run = False
         tables = (f"{ticker}-avn",f"{ticker}-avd",f"{ticker}-tsl",f"{ticker}-signal")
         print(tables)
@@ -475,10 +477,12 @@ def checkBuySignal():
         buy_signal_count = 0
         sell_signal_count = 0
         buy_signal_flag = True
-    else:
         sell_signal_flag = False
-        #sendDiscordMessage(f'Recieved Buy signal with count {buy_signal_count}')
+    elif buy_signal_flag == False:
+        sell_signal_flag = False
+        sendDiscordMessage(f'Recieved Buy signal with count {buy_signal_count}')
         buy_signal_count = buy_signal_count + 1
+        buy_signal_flag = False
         
 def checkSellSignal():
     global sell_signal_flag
@@ -495,9 +499,10 @@ def checkSellSignal():
         sell_signal_count = 0
         buy_signal_count = 0
         sell_signal_flag = True
-    else:
         buy_signal_flag = False
-        #sendDiscordMessage(f'Recieved Sell signal with count {sell_signal_count}')
+    elif sell_signal_flag == False :
+        buy_signal_flag = False
+        sendDiscordMessage(f'Recieved Sell signal with count {sell_signal_count}')
         log.info(buy_signal_count)
         log.info(sell_signal_flag)
         sell_signal_count = sell_signal_count + 1
@@ -546,8 +551,8 @@ def calcTsl(data):
 
             log.info(live)
             if data is not None and live is not None:
-                print(f'Live Price is {live}')
-                print(f'TSL New Data is {data}')
+                #print(f'Live Price is {live}')
+                #print(f'TSL New Data is {data}')
                 now_utc = pytz.utc.localize(datetime.utcnow())
                 now_est = now_utc.astimezone(tz)
                 now_est = now_est.strftime('%Y-%m-%d %H:%M:%S.%f')#
@@ -566,6 +571,11 @@ def calcTsl(data):
                 res1 = float(max(last3H1))#
                 sup0 = float(min(low3H0))  # Min of prior including active [0]
                 sup1 = float(min(low3H1))
+
+                print(f"Sup0 is {sup0}")
+                print(f"Sup1 is {sup1}")
+                print(f"Res0 is {res0}")
+                print(f"Res1 is {res1}")
 
                 # AVD - Checks is live value is below or above prior candle
                 # support/resistance
@@ -602,10 +612,18 @@ def calcTsl(data):
 
                 close = float(data.c.tail(1).iloc[0])
 
-                if live > tsl and live > close and buy_signal_flag == False:
+                print(f"buy_signal_flag is {buy_signal_flag}")
+                print(f"sell_signal_flag is {sell_signal_flag}")
+                print(f"live is {live}")
+                print(f"tsl is {tsl}")
+                print(f"close is {close}")
+
+                if live > tsl and live > close and avn is not None:
+                    print('Buy Signal!')
                     checkBuySignal()
 
-                if live < tsl and live < close and sell_signal_flag == False:
+                if live < tsl and live < close and avn is not None:
+                    print('Sell Signal!')
                     checkSellSignal()
 
                 if checkTableExists(signal_table, cursor):

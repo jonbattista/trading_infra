@@ -27,6 +27,7 @@ if DB_HOST is None:
 
 ticker = None
 database = "trades"
+first_run = True
 
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
@@ -34,6 +35,36 @@ log.propagate = False
 consoleHandler = logging.StreamHandler(stdout)
 log.addHandler(consoleHandler)
 
+
+def dropTables():
+    global ticker
+    global database
+    global DB_HOST
+    global first_run
+    global DB_PASS
+
+    if first_run:
+        first_run = False
+        tables = ({ticker}, f"{ticker}-avn",f"{ticker}-avd",f"{ticker}-tsl",f"{ticker}-signal")
+        print(tables)
+        connection = pymysql.connect(host=DB_HOST,
+                                 user='root',
+                                 password=DB_PASS,
+                                 database=database,
+                                 charset='utf8mb4',
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 autocommit=True)
+        with connection.cursor() as cursor:
+            for table in tables:
+                try:
+                    sql = f"DROP TABLE `{table}`;"
+                    res = cursor.execute(sql)
+                    result = cursor._last_executed
+                    log.info(f"Dropped Table: {result}")
+                except Exception as e:
+                    log.error(f"Drop Table Error: {e}")
+    
+            cursor.close()
 
 def checkTableExists(table, cursor):
     try:
@@ -48,6 +79,25 @@ def checkTableExists(table, cursor):
         return True
     else:
         return False
+
+def getPreviousTimeframe(cursor, ticker,):
+    try:
+        sql = f"SELECT COUNT(*) FROM `{ticker}`;"
+        print(sql)
+        cursor.execute(sql)
+        count = cursor.fetchone()
+    except Exception as e:
+        print(e)
+    print(count)
+    try:
+        sql = f"SELECT t FROM `{ticker}` where `index` = {count['COUNT(*)'] - 2};"
+        print(sql)
+        cursor.execute(sql)
+        res = cursor.fetchone()
+    except Exception as e:
+        log.error(f"Error fetching Previous Timeframe: {e}")
+    print(res['t'])
+    return res['t']
 
 def fetchTicker():
     global ticker
@@ -131,7 +181,7 @@ def fetchHistoricalData():
     now = int(datetime.now(tz).timestamp())
     #print(now)
     range = 5
-    diff = range * 60 + 55
+    diff = range * 60 * 1 + 55
     #print(diff)
     then = now - diff
     #print(then)
@@ -172,22 +222,23 @@ def fetchHistoricalData():
         now_utc = utc.localize(datetime.utcnow())
         #print(now_utc)
         now_est = now_utc.astimezone(tz)
-        previous_time = datetime.strptime(df.at[index - 1,'t'], '%Y-%m-%d %H:%M:%S')
-        print(previous_time)
-        previous_minute = previous_time.minute
-        current_minute = now_est.minute
-
-        print(f"Previous Minute is {previous_minute}")
-        print(f"Current minute {current_minute}")
-
-        current_minute_string = now_est.strftime('%Y-%m-%d %H:%M:00')
 
         with connection.cursor() as cursor:
             with sqlEngine.connect() as dbConnection:
                 if checkTableExists(ticker, cursor):
+                    #previous_time = datetime.strptime(getPreviousTimeframe(cursor, ticker), '%Y-%m-%d %H:%M:%S')
+                    previous_time = getPreviousTimeframe(cursor, ticker)
+                    print(previous_time)
+                    previous_minute = previous_time.minute
+                    current_minute = now_est.minute
+
+                    print(f"Previous Minute is {previous_minute}")
+                    print(f"Current minute {current_minute}")
+
+                    current_minute_string = now_est.strftime('%Y-%m-%d %H:%M:00')
                     try:
                         cols = "`,`".join([str(i) for i in df.columns.tolist()])
-                        #print(f"Columns: {cols}")
+                        print(f"Columns: {cols}")
 
                         if current_minute > previous_minute:
                             # Insert DataFrame recrds one by one.
@@ -203,10 +254,11 @@ def fetchHistoricalData():
                                         keys = keys + f"`{k}` = '{v}', "
                                 keys = keys[:-2]
 
-                                #print(f"Keys/Values are {keys}")
+                                print(f"Keys/Values are {keys}")
 
                                 try:
-                                    sql = f"UPDATE `{ticker}` SET {keys} WHERE `index` = {i - 1}"
+                                    sql = f"UPDATE `{ticker}` SET {keys} WHERE `index` = {i}"
+                                    print(sql)
                                     cursor.execute(sql)
                                     print(f"Rows Modified = {cursor.rowcount}")
                                     result = cursor._last_executed
@@ -269,7 +321,7 @@ def fetchHistoricalData():
 
 def main():
     print('Running Initial Historical Fetch!')
-
+    dropTables()
     fetchHistoricalData()
 
     print("Scheduling Fetch Loop!")

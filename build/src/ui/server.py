@@ -789,6 +789,7 @@ def update_metrics(n):
         html.H1(f'AVN is {last_avn}', style = {'margin':40}),
         html.H1(f'AVD is {last_avd}', style = {'margin':40}),
         html.H1(f'Last Price is ${live_price}', style = {'margin':40}),
+        #html.H1(f'TSL is ${tsl}', style = {'margin':40}),
 #        html.H1(f'Support 0 is {sup0}', style = {'margin':40}),
 #        html.H1(f'Support 1 is {sup1}', style = {'margin':40}),
 #        html.H1(f'Resistance 0 is {res0}', style = {'margin':40}),

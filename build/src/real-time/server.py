@@ -116,10 +116,10 @@ def buildCandleDataFrame(live):
                     previous_minute = previous_time.minute
                     current_minute = now_est.minute
 
-                    print(f"Previous Minute is {previous_minute}")
-                    print(f"Current minute {current_minute}")
+                    print(f"Previous Timeframe is {previous_minute}")
+                    print(f"Current Timeframe is {current_minute}")
 
-                    current_minute_string = now_est.strftime('%Y-%m-%d %H:%M:00')
+                    current_timeframe_string = now_est.strftime('%Y-%m-%d %H:%M:00')
 
 #                    if current_minute > previous_minute:
 #                        i = df_len
@@ -145,7 +145,7 @@ def buildCandleDataFrame(live):
                     data.at[index,'l']=low_value
                     data.at[index,'c']=close_value
                     data.at[index,'v']=0
-                    data.at[index,'t']=current_minute_string
+                    data.at[index,'t']=current_timeframe_string
 
                     log.info(data)
                     cols = "`,`".join([str(i) for i in data.columns.tolist()])
