@@ -27,7 +27,7 @@ if DB_HOST is None:
 
 ticker = None
 database = "trades"
-first_run = True
+timeframe = None
 
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
@@ -40,31 +40,28 @@ def dropTables():
     global ticker
     global database
     global DB_HOST
-    global first_run
     global DB_PASS
 
-    if first_run:
-        first_run = False
-        tables = ({ticker}, f"{ticker}-avn",f"{ticker}-avd",f"{ticker}-tsl",f"{ticker}-signal")
-        print(tables)
-        connection = pymysql.connect(host=DB_HOST,
-                                 user='root',
-                                 password=DB_PASS,
-                                 database=database,
-                                 charset='utf8mb4',
-                                 cursorclass=pymysql.cursors.DictCursor,
-                                 autocommit=True)
-        with connection.cursor() as cursor:
-            for table in tables:
-                try:
-                    sql = f"DROP TABLE `{table}`;"
-                    res = cursor.execute(sql)
-                    result = cursor._last_executed
-                    log.info(f"Dropped Table: {result}")
-                except Exception as e:
-                    log.error(f"Drop Table Error: {e}")
-    
-            cursor.close()
+    tables = ({ticker}, f"{ticker}-avn",f"{ticker}-avd",f"{ticker}-tsl",f"{ticker}-signal")
+    print(tables)
+    connection = pymysql.connect(host=DB_HOST,
+                             user='root',
+                             password=DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
+    with connection.cursor() as cursor:
+        for table in tables:
+            try:
+                sql = f"DROP TABLE `{table}`;"
+                res = cursor.execute(sql)
+                result = cursor._last_executed
+                log.info(f"Dropped Table: {result}")
+            except Exception as e:
+                log.error(f"Drop Table Error: {e}")
+
+        cursor.close()
 
 def checkTableExists(table, cursor):
     try:
@@ -104,6 +101,7 @@ def fetchTicker():
     global database
     global DB_HOST
     global DB_PASS
+    global timeframe
 
     old_ticker = ticker
 
@@ -120,26 +118,31 @@ def fetchTicker():
     with connection.cursor() as cursor:
         if checkTableExists(table, cursor):
             try:
-                sql = f"SELECT ticker FROM {table};"
+                sql = f"SELECT ticker, timeframe FROM {table};"
                 cursor.execute(sql)
                 res = cursor.fetchone()
             except Exception as e:
                 log.error(f"Error fetching Ticker: {e}")
+            else:
+                if ticker is None:
+                    ticker = res['ticker']
+                    log.info(f"Set Ticker to {ticker}")
+                
+                if res['ticker'] is not None and old_ticker != res['ticker']:
+                    ticker = res['ticker']
+                    log.info(f"Updated Ticker from {old_ticker} to {ticker}")
+
+                if res['timeframe'] is not None:
+                    timeframe = res['timeframe']
+
+                print(f"Ticker is {ticker}")
             finally:
                 cursor.close()
             log.info(res)
 
-            if ticker is None:
-                ticker = res['ticker']
-                log.info(f"Set Ticker to {ticker}")
-            
-            if res['ticker'] is not None and old_ticker != res['ticker']:
-                ticker = res['ticker']
-                log.info(f"Updated Ticker from {old_ticker} to {ticker}")
-            print(f"Ticker is {ticker}")
         else:
             try:
-                sql = f"CREATE TABLE IF NOT EXISTS `{table}` (`index` BIGINT,ticker TEXT);"
+                sql = f"CREATE TABLE IF NOT EXISTS `{table}` (`index` BIGINT, ticker TEX, inverse_trade BOOLEAN, timeframe TEXT, fake_sensitivity BIGINT);"
                 cursor.execute(sql)
                 result = cursor._last_executed
                 print(f"Created: {result}")
@@ -161,6 +164,7 @@ def fetchHistoricalData():
     global database
     global DB_HOST
     global DB_PASS
+    global timeframe
 
     fetchTicker()
 
@@ -176,15 +180,25 @@ def fetchHistoricalData():
 
     print('Fetching Historical Data...')
 
-    timeframe = 1
     tz = timezone('US/Eastern')
     now = int(datetime.now(tz).timestamp())
-    #print(now)
+
     range = 5
-    diff = range * 60 * 1 + 55
-    #print(diff)
+
+    if timeframe == '30':
+        log.info("Using 150m (5 x 30m intervals) difference")
+        diff = range * 60 * 30 + 55
+    elif timeframe == '60':
+        log.info("Using 5 hour (5 x 1h interval) difference")
+        diff = range * 60 * 60 + 55
+    elif timeframe == 'D':
+        log.info("Using 5 day (5 x 24h interval) difference")
+        diff = range * 60 * 60 * 24 + 55
+
+    log.info(f"Now is {now}")
+    log.info(f"Diff is {diff}")
     then = now - diff
-    #print(then)
+    log.info(f"Then is {then}")
 
     if ticker == 'BINANCE:BTCUSDT':
         url = f"https://finnhub.io/api/v1/crypto/candle?symbol={ticker}&resolution={timeframe}&from={then}&to={now}&token={FINNHUB_API_KEY}"
@@ -192,9 +206,9 @@ def fetchHistoricalData():
         url = f"https://finnhub.io/api/v1/stock/candle?symbol={ticker}&resolution={timeframe}&from={then}&to={now}&token={FINNHUB_API_KEY}"
 
     print(url)
-    print(f"Now: {datetime.fromtimestamp(now)}")
+    log.info(f"Now: {datetime.fromtimestamp(now)}")
 
-    print(f"Then: {datetime.fromtimestamp(then)}")
+    log.info(f"Then: {datetime.fromtimestamp(then)}")
 
     res = requests.get(url)
     data = res.json()
@@ -240,7 +254,7 @@ def fetchHistoricalData():
                         cols = "`,`".join([str(i) for i in df.columns.tolist()])
                         print(f"Columns: {cols}")
 
-                        if current_minute > previous_minute:
+                        if current_minute != previous_minute:
                             # Insert DataFrame recrds one by one.
                             for i,row in df.iterrows():
                                 keys = ""
@@ -257,7 +271,9 @@ def fetchHistoricalData():
                                 print(f"Keys/Values are {keys}")
 
                                 try:
-                                    sql = f"UPDATE `{ticker}` SET {keys} WHERE `index` = {i}"
+                                    #sql = f"UPDATE `{ticker}` SET {keys} WHERE `index` = {i}"
+                                    sql = f"INSERT INTO `{ticker}` (`index`,c,h,l,o,s,t,v) VALUES ({i},{tuple(row)[0]},{tuple(row)[1]},{tuple(row)[2]},{tuple(row)[3]},'{tuple(row)[4]}','{tuple(row)[5]}',{tuple(row)[6]}) ON DUPLICATE KEY UPDATE {keys};"
+
                                     print(sql)
                                     cursor.execute(sql)
                                     print(f"Rows Modified = {cursor.rowcount}")
@@ -321,7 +337,11 @@ def fetchHistoricalData():
 
 def main():
     print('Running Initial Historical Fetch!')
+    
+    fetchTicker()
+
     dropTables()
+
     fetchHistoricalData()
 
     print("Scheduling Fetch Loop!")

@@ -11,6 +11,7 @@ import pytz
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+import dash_daq as daq
 from dash.dependencies import Output, Input, State
 from sqlalchemy import create_engine
 import pymysql.cursors
@@ -58,6 +59,9 @@ sup1 = 0
 res0 = 0
 res1 = 0
 signal = None
+tsl = None
+tsl_value = None
+
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
 log.propagate = False
@@ -76,54 +80,61 @@ def fetchTicker():
 
     old_ticker = ticker
 
-    #print(f"old_ticker is {old_ticker}")
-    table = f"ticker"
-    connection = pymysql.connect(host=DB_HOST,
-                             user='root',
-                             password=DB_PASS,
-                             database=database,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor,
-                             autocommit=True)
+    if ticker is not None and ticker:
+        #print(f"old_ticker is {old_ticker}")
+        table = 'ticker'
+        connection = pymysql.connect(host=DB_HOST,
+                                 user='root',
+                                 password=DB_PASS,
+                                 database=database,
+                                 charset='utf8mb4',
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 autocommit=True)
 
-    with connection.cursor() as cursor:
-        if checkTableExists(table, cursor):
-            try:
-                sql = f"SELECT ticker FROM {table};"
-                cursor.execute(sql)
-                res = cursor.fetchone()
-            except Exception as e:
-                log.error(f"Error fetching Ticker: {e}")
-            finally:
+        with connection.cursor() as cursor:
+            if checkTableExists(table, cursor):
+                try:
+                    sql = f"SELECT ticker FROM {table};"
+                    cursor.execute(sql)
+                    res = cursor.fetchone()
+                except Exception as e:
+                    log.error(f"Error fetching Ticker: {e}")
+                else:
+                    log.info(res)
+                finally:
+                    cursor.close()
+
+                ticker_value = res['ticker']
+                log.info(res)
+                print(bool(ticker_value))
+
+                if ticker is None and ticker_value:
+                    ticker = ticker_value
+                    log.info(f"Set Ticker to {ticker}")
+                
+                if ticker_value and ticker_value is not None and old_ticker != res['ticker']:
+                    ticker = ticker_value
+                    log.info(f"Updated Ticker from {old_ticker} to {ticker}")
+            else:
+                try:
+                    sql = f"CREATE TABLE IF NOT EXISTS `ticker` (`index` BIGINT, ticker TEXT, inverse_trade BOOLEAN, timeframe TEXT, fake_sensitivity BIGINT);"
+                    cursor.execute(sql)
+                    result = cursor._last_executed
+                except Exception as e:
+                    print(f"Error createing Ticker Table: {e}")
+                else:
+                    log.info(f"Created Ticker Table: {result}")
+
+                try:
+                    sql = f"INSERT INTO `{table}` (`index`,ticker) VALUES (0,'{ticker}')"
+                    cursor.execute(sql)
+                    result = cursor._last_executed
+                except Exception as e:
+                     log.info(f"Error inserting into Ticker Table: {e}")
+                else:
+                    log.info(f"Inserted into Ticker Table: {result}")
+                
                 cursor.close()
-            #log.info(res)
-
-            if ticker is None:
-                ticker = res['ticker']
-                log.info(f"Set Ticker to {ticker}")
-            
-            if res['ticker'] is not None and old_ticker != res['ticker']:
-                ticker = res['ticker']
-                log.info(f"Updated Ticker from {old_ticker} to {ticker}")
-            #print(f"Ticker is {ticker}")
-        else:
-            try:
-                sql = f"CREATE TABLE IF NOT EXISTS `{table}` (`index` BIGINT,ticker TEXT);"
-                cursor.execute(sql)
-                result = cursor._last_executed
-                print(f"Created: {result}")
-            except Exception as e:
-                print(f"Error createing Ticker Table: {e}")
-
-            try:
-                sql = f"INSERT INTO `{table}` (`index`,ticker) VALUES (0,'{ticker}')"
-                cursor.execute(sql)
-                result = cursor._last_executed
-                print(result)
-            except Exception as e:
-                print(f"Error inserting into Ticker Table: {e}")
-            
-            cursor.close()
 
 def sendDiscordMessage(message):
     url = "https://discord.com/api/webhooks/831890918796820510/OWR1HucrnJzHdTE-vASdf5EIbPC1axPikD4D5lh0VBn413nARUW4mla3xPjZHWCK9-9P"
@@ -184,7 +195,7 @@ def dropTables(ticker):
     
     cursor.close()
 
-def updateTicker(ticker):
+def updateTicker(new_ticker, inverse_toggle_value, timeframe, fake_sensitivity):
     global database
     global DB_HOST
     global DB_PASS
@@ -205,12 +216,12 @@ def updateTicker(ticker):
     last_avn = None
     last_avd = None
     signal = None
-
-    dropTables(ticker)
-
+    print('bark')
+    dropTables(new_ticker)
+    log.info(f"inverse_toggle_value is {inverse_toggle_value}")
     tables = {}
 
-    tables[f"{ticker}"] = {
+    tables[f"{new_ticker}"] = {
         "index": "BIGINT PRIMARY KEY",
         "c": "DOUBLE",
         "h": "DOUBLE",
@@ -220,23 +231,23 @@ def updateTicker(ticker):
         "t": "DATETIME",
         "v": "DOUBLE",
     }
-    tables[f"{ticker}-live"] = { 
-        "id": "INT",
+    tables[f"{new_ticker}-live"] = { 
+        "index": "INT",
         "price": "FLOAT"
     }
-    tables[f"{ticker}-avn"] = {
+    tables[f"{new_ticker}-avn"] = {
         "value": "DOUBLE",
         "timestamp": "DATETIME"
     }
-    tables[f"{ticker}-avd"] = {
+    tables[f"{new_ticker}-avd"] = {
         "value": "DOUBLE",
         "timestamp": "DATETIME"
     }
-    tables[f"{ticker}-tsl"] = {
+    tables[f"{new_ticker}-tsl"] = {
         "value": "DOUBLE",
         "timestamp": "DATETIME"
     }
-    tables[f"{ticker}-signal"] = {
+    tables[f"{new_ticker}-signal"] = {
         "index": "BIGINT",
         "value": "TEXT"
     }
@@ -260,55 +271,71 @@ def updateTicker(ticker):
 
 
         with connection.cursor() as cursor:
+            # Create all tables for new Ticker
             if not checkTableExists(table, cursor):
                 try:
                     sql = f"CREATE TABLE IF NOT EXISTS `{table}` ({key_values[:-1]});"
-                    print(sql)
+                    log.info(sql)
                     cursor.execute(sql)
                     result = cursor._last_executed
-                    print(f"Created Table: {result}")
                 except Exception as e:
-                    print(f"Error creating Table: {e}")
+                    log.error(f"Error creating Table {table}: {e}")
+                else:
+                    log.info(f"Created Table {table}: {result}")
 
+            # Create / Update Ticker table value
             if checkTableExists('ticker', cursor):
                 try:
-                    sql = f"UPDATE ticker SET ticker = '{ticker}' where `index` = 0"
-                    print(sql)
+                    sql = f"UPDATE `ticker` SET ticker = '{new_ticker}', inverse_trade = {inverse_toggle_value}, timeframe = '{timeframe}', fake_sensitivity = '{fake_sensitivity}' where `index` = 0"
+                    log.info(sql)
                     result = cursor._last_executed
-                    print(f"Updated: {result}")
                     cursor.execute(sql)
                     res = cursor.fetchone()
                 except Exception as e:
                     log.error(f"Error updating Ticker: {e}")
-                finally:
-                    cursor.close()
+                else:
+                    log.info(f"Updated Ticker table: {new_ticker} with {result}")
                 log.info(res)
 
                 if res is not None:
-                    if ticker is None:
-                        ticker = res['ticker']
-                        log.info(f"Set Ticker to {ticker}")
+                    if new_ticker is None:
+                        new_ticker = res['ticker']
+                        log.info(f"Set Ticker to {new_ticker}")
                     
                     if res['ticker'] is not None and old_ticker != res['ticker']:
-                        ticker = res['ticker']
-                        log.info(f"Updated Ticker from {old_ticker} to {ticker}")
-                    print(f"Ticker is {ticker}")
+                        new_ticker = res['ticker']
+                        log.info(f"Updated Ticker from {old_ticker} to {new_ticker}")
+                    print(f"Ticker is {new_ticker}")
             else:
                 try:
-                    sql = f"CREATE TABLE IF NOT EXISTS {table}` (`index` BIGINT,ticker TEXT);"
+                    sql = f"CREATE TABLE IF NOT EXISTS `ticker` (`index` BIGINT, ticker TEXT, inverse_trade BOOLEAN, timeframe TEXT, fake_sensitivity BIGINT);"
+                    log.info(log.info)
                     cursor.execute(sql)
                     result = cursor._last_executed
-                    print(f"Created: {result}")
                 except Exception as e:
-                    print(f"Error createing Ticker Table: {e}")
+                    log.error(f"Error creating Ticker Table: {e}")
+                else:
+                    log.info(f"Created Ticker table: {result}")
 
                 try:
-                    sql = f"INSERT INTO `{table}` (`index`,ticker) VALUES (0,'{ticker}')"
+                    sql = f"INSERT INTO `ticker` (`index`,ticker) VALUES (0,'{new_ticker}')"
+                    log.info(sql)
                     cursor.execute(sql)
                     result = cursor._last_executed
-                    print(result)
                 except Exception as e:
-                    print(f"Error inserting into Ticker Table: {e}")
+                    log.error(f"Error inserting into Ticker Table: {e}")
+                else:
+                   log.info(f"Inserted Ticker table: {result}")
+
+                try:
+                    sql = f"INSERT INTO `ticker` (`index`,inverse_trade) VALUES (0,{inverse_toggle_value})"
+                    log.info(sql)
+                    cursor.execute(sql)
+                    result = cursor._last_executed
+                except Exception as e:
+                    log.error(f"Error inserting Inverse value into Ticker Table: {e}")
+                else:
+                   log.info(f"Inserted Inverse value into Ticker table: {result}")
                 
                 cursor.close()
 
@@ -515,17 +542,18 @@ def fetchTsl():
         return tsl
 
 def fetchLastCandles(dbConnection, ticker):
-    try:
-        data = pd.read_sql_query(f"SELECT * FROM `{ticker}`", dbConnection);
-    except Exception as e:
-        raise(e)
-    finally:
-        dbConnection.close()
+    if ticker is not None and ticker:
+        try:
+            data = pd.read_sql_query(f"SELECT * FROM `{ticker}`", dbConnection);
+        except Exception as e:
+            log.error(e)
+        finally:
+            dbConnection.close()
 
-    pd.set_option('display.expand_frame_repr', False)
-    #print(f"Fetched Table: {data}")
+        pd.set_option('display.expand_frame_repr', False)
+        #print(f"Fetched Table: {data}")
 
-    return data
+        return data
 
 
 
@@ -542,14 +570,42 @@ auth = dash_auth.BasicAuth(
 
 def serve_layout():
     return html.Div(children=[
-        dcc.Input(
-            id="ticker",
-            type="text",
-            placeholder="Enter Ticker",
-        ),
-        html.Button('Submit', id='submit-ticker', n_clicks=0),
-        html.Div(id='ticker-output',
-             children='Enter a value and press submit'),
+        html.Div([
+            dcc.Input(
+                id="new-ticker",
+                type="text",
+                placeholder="Enter Ticker",
+            ),
+            dcc.RadioItems(
+                id="timeframe-input",
+                options=[
+                    {'label': '1 Day', 'value': 'D'},
+                    {'label': '1 Hour', 'value': '60'},
+                    {'label': '30m', 'value': '30'}
+                ],
+                value=''
+            ),
+            dcc.RadioItems(
+                id="fake-sensitivity",
+                options=[
+                    {'label': 'Conservative - 20', 'value': '20'},
+                    {'label': 'Moderate - 15', 'value': '15'},
+                    {'label': 'Liberal - 5', 'value': '5'}
+                ],
+                value=''
+            ),
+            dcc.RadioItems(
+                id="submit-inverse-toggle",
+                options=[
+                    {'label': 'Regular', 'value': 'False'},
+                    {'label': 'Inverse', 'value': 'True'},
+                ],
+                value=''
+            ),
+            html.Button('Submit', id='submit-ticker', n_clicks=0),
+            html.Div(id='ticker-output',
+                 children='Enter a value and press submit'),
+        ]),
         dcc.Graph(id = 'candles'),
         html.Div(id='metrics', style = {'display': 'flex', 'align-items': 'center', 'justify-content': 'center'}),
         html.Div([
@@ -588,72 +644,76 @@ def update_candles(n):
 
     fetchTicker()
 
-    try:
-        sqlEngine = create_engine(f'mysql+pymysql://root:{DB_PASS}@{DB_HOST}/{database}', pool_recycle=3600)
-    except Exception as e:
-        print(f"SQL Engine Error: {e}")
+    if ticker is not None:
+        try:
+            sqlEngine = create_engine(f'mysql+pymysql://root:{DB_PASS}@{DB_HOST}/{database}', pool_recycle=3600)
+        except Exception as e:
+            print(f"SQL Engine Error: {e}")
 
-    fig = go.Figure()
-    live_table = f"{ticker}-live"
+        fig = go.Figure()
+        live_table = f"{ticker}-live"
 
-    connection = pymysql.connect(host=DB_HOST,
-                             user='root',
-                             password=DB_PASS,
-                             database=database,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor,
-                             autocommit=True)
-    print('meow')
-    with sqlEngine.connect() as dbConnection:
-        with connection.cursor() as cursor:
-            if checkTableExists(live_table, cursor):
-                sql = f"SELECT * FROM `{live_table}`"
-                cursor.execute(sql)
-                res = cursor.fetchone()
-                live_price = res['price']
-                print(live_price)
-        print('woof')
-        new_data = fetchLastCandles(dbConnection, ticker)
+        connection = pymysql.connect(host=DB_HOST,
+                                 user='root',
+                                 password=DB_PASS,
+                                 database=database,
+                                 charset='utf8mb4',
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 autocommit=True)
+        print('meow')
+        with sqlEngine.connect() as dbConnection:
+            with connection.cursor() as cursor:
+                if checkTableExists(live_table, cursor):
+                    sql = f"SELECT * FROM `{live_table}`"
+                    cursor.execute(sql)
+                    res = cursor.fetchone()
+                    live_price = res['price']
+                    print(live_price)
+            print('woof')
+            new_data = fetchLastCandles(dbConnection, ticker)
 
-        fetchSignal()
+            fetchSignal()
 
-        print(new_data)
-        if new_data is not None:
-            candlesticks = go.Candlestick(x=new_data['t'],
-                                   open=new_data['o'],
-                                   high=new_data['h'],
-                                   low=new_data['l'],
-                                   close=new_data['c'], name='Market Data')
+            print(new_data)
+            if new_data is not None:
+                candlesticks = go.Candlestick(x=new_data['t'],
+                                       open=new_data['o'],
+                                       high=new_data['h'],
+                                       low=new_data['l'],
+                                       close=new_data['c'], name='Market Data')
 
-            fig.add_trace(candlesticks)
+                fig.add_trace(candlesticks)
 
-            # Add Titles
-            fig.update_layout(
-                title=ticker + ' Live Price Data',
-                yaxis_title='Price (USD/share)'
-            )
+                # Add Titles
+                fig.update_layout(
+                    title=ticker + ' Live Price Data',
+                    yaxis_title='Price (USD/share)'
+                )
 
-            # Axis and control
-            fig.update_xaxes(
-                rangeslider_visible=True,
-                rangeselector={'buttons': list((
-                    dict(count=15, label="15m", step="minute", stepmode="backward"),
-                    dict(count=30, label="30m", step="minute", stepmode="backward"),
-                    dict(count=1, label="1h", step="hour", stepmode="backward"),
-                    dict(count=2, label="2h", step="hour", stepmode="backward"),
-                    dict(step="all")
-                ))})
-            old_fig = fig
+                # Axis and control
+                fig.update_xaxes(
+                    rangeslider_visible=True,
+                    rangeselector={'buttons': list((
+                        dict(count=15, label="15m", step="minute", stepmode="backward"),
+                        dict(count=30, label="30m", step="minute", stepmode="backward"),
+                        dict(count=1, label="1h", step="hour", stepmode="backward"),
+                        dict(count=2, label="2h", step="hour", stepmode="backward"),
+                        dict(step="all")
+                    ))})
+                old_fig = fig
 
-            return fig
-        else:
-            return old_fig
+                return fig
+            else:
+                return old_fig
+    else:
+        return {}
 
 @app.callback(
     Output('tsl', 'figure'),
     [Input('interval-component', 'n_intervals')]
 )
 def update_tsl(n):
+    global tsl
     fig = go.Figure()
 
     tsl = fetchTsl()
@@ -783,13 +843,19 @@ def update_metrics(n):
     global last_avn
     global last_avd
     global signal
+    global tsl
+    global tsl_value
+
+    if tsl is not None and 'y' in tsl:
+        log.info(f"tsl is {tsl['y'][-1]}")
+        tsl_value = tsl['y'][-1]
 
     return [
         html.H1(f'Signal is {signal}', style = {'margin':40}),
         html.H1(f'AVN is {last_avn}', style = {'margin':40}),
         html.H1(f'AVD is {last_avd}', style = {'margin':40}),
         html.H1(f'Last Price is ${live_price}', style = {'margin':40}),
-        #html.H1(f'TSL is ${tsl}', style = {'margin':40}),
+        html.H1(f'TSL is ${tsl_value}', style = {'margin':40}),
 #        html.H1(f'Support 0 is {sup0}', style = {'margin':40}),
 #        html.H1(f'Support 1 is {sup1}', style = {'margin':40}),
 #        html.H1(f'Resistance 0 is {res0}', style = {'margin':40}),
@@ -798,18 +864,33 @@ def update_metrics(n):
 
 @app.callback(
     Output("ticker-output", "children"),
-    [Input('submit-ticker', 'n_clicks')],
-    [State('ticker', 'value')]
+    Input('submit-ticker', 'n_clicks'),
+    State('new-ticker', 'value'),
+    State('submit-inverse-toggle', 'value'),
+    State('timeframe-input', 'value'),
+    State('fake-sensitivity', 'value')
 )
-def update_ticker(n_clicks,value):
+def update_ticker(n_clicks, new_ticker, inverse_toggle_value_input, timeframe, fake_sensitivity):
     global ticker
-    log.info(value)
-    if value is not None:
-        ticker = value
-        updateTicker(ticker)
-        return f"Ticker was {ticker}"
+    log.info(f"new_ticker is {new_ticker}")
+    log.info(f"inverse_toggle_value_input is {inverse_toggle_value_input}")
+    log.info(f"timeframe is {timeframe}")
+    log.info(f"fake_sensitivity is {fake_sensitivity}")
+
+    if inverse_toggle_value_input is not None and inverse_toggle_value_input == 'True':
+        inverse_toggle_value = True
     else:
-        return f"Input was empty"
+        inverse_toggle_value = False
+
+    if new_ticker is not None and new_ticker:
+        ticker = new_ticker
+        try:
+            updateTicker(ticker,inverse_toggle_value, timeframe, fake_sensitivity)
+            return f"Ticker was {ticker}"
+        except Exception as e:
+            log.error(e)
+    else:
+        return f""
 
 if __name__ == '__main__':
     if DB_PASS is not None or FINNHUB_API_KEY is not None:

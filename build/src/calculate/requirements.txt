@@ -16,3 +16,4 @@ python-dotenv
 gunicorn
 flask
 pytz
+alpaca_trade_api

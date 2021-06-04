@@ -20,6 +20,7 @@ from pytz import timezone
 from threading import Timer
 from apscheduler.schedulers.blocking import BlockingScheduler
 from time import sleep
+import alpaca_trade_api as tradeapi
 
 load_dotenv()
 
@@ -43,7 +44,6 @@ new_data = None
 first_run = True
 avn = None
 previous_avd = 0
-live_price = None
 data = None
 last_minute = None
 database = "trades"
@@ -59,9 +59,19 @@ check_buy_signal = False
 check_sell_signal = False
 buy_signal_flag = False
 sell_signal_flag = False
-signal_count_limit = 2
+signal_count_limit = 0
+inverse_trade = False
+live = None
 
-
+inverse_table = {
+    'TQQQ': 'SQQQ',
+    'SPXL': 'SPXS',
+    'SOXL': 'SOXS',
+    'FNGU': 'FNGD',
+    'GUSH': 'DRIP',
+    'LABU': 'LABD',
+    'BINANCE:BTCUSDT': 'CTB'
+}
 
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
@@ -74,17 +84,52 @@ VALID_USERNAME_PASSWORD_PAIRS = {
 }
 
 def checkTableExists(table, cursor):
+    count = None
     try:
         sql = f"SELECT COUNT(*) FROM `{table}`"
         cursor.execute(sql)
         count = cursor.fetchone()
     except Exception as e:
-        count = None     
-    
-    if count is not None and count['COUNT(*)'] > 0:
-        return True
+        log.error(f"Error Checking Table Exists: {e}")
+        count = None
     else:
-        return False
+        log.info(f"Count is {count}")
+        if count is not None and count['COUNT(*)'] > 0:
+            return True
+        else:
+            return False
+
+def sendWebhook(data):
+    global ticker
+    APCA_API_KEY_ID = 'PK1DW9PYFTSM2IC6XYYL'
+    APCA_API_SECRET_KEY = 'FFDPNjs3aqGL3iXx0bixL167gXPSxkGqQEIrLkQh'
+
+    if APCA_API_KEY_ID[0:2] == 'PK':
+        api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
+        log.info('Using AlpacaPaper Trading API')
+    elif APCA_API_KEY_ID[0:2] == 'AK':
+        api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://api.alpaca.markets')
+        log.info('Using Alpaca Live Trading API')
+    else:
+        log.error(f'Error: API Key {APCA_API_KEY_ID} is malformed.')
+        sendDiscordMessage(f'Error: API Key {APCA_API_KEY_ID} is malformed.')
+        return 'Error: API Key {user} is malformed.', 400
+    try:
+        order = api.submit_order(
+                    symbol=ticker,
+                    qty=data['qty'],
+                    side=data['side'],
+                    type='limit',
+                    limit_price=data['price'],
+                    time_in_force='day',
+                )
+    except tradeapi.rest.APIError as e:
+        log.error(e)
+    else:
+        log.info(order)
+    #url = f"https://trading.battista.dev/?APCA_API_KEY_ID={APCA_API_KEY_ID}&APCA_API_SECRET_KEY={APCA_API_SECRET_KEY}"
+    #res = requests.post(url, data)
+    #log.info(res)
 
 def sendDiscordMessage(message):
     url = "https://discord.com/api/webhooks/831890918796820510/OWR1HucrnJzHdTE-vASdf5EIbPC1axPikD4D5lh0VBn413nARUW4mla3xPjZHWCK9-9P"
@@ -170,7 +215,7 @@ def fetchTicker():
             print(f"Ticker is {ticker}")
         else:
             try:
-                sql = f"CREATE TABLE IF NOT EXISTS `{table}` (`index` BIGINT,ticker TEXT);"
+                sql = f"CREATE TABLE IF NOT EXISTS `{table}` (`index` BIGINT, ticker TEXT, inverse_trade BOOLEAN, timeframe TEXT, fake_sensitivity BIGINT);"
                 cursor.execute(sql)
                 result = cursor._last_executed
                 print(f"Created: {result}")
@@ -390,11 +435,13 @@ def updateTsl(value,timestamp):
         if checkTableExists(table, cursor):
             try:
                 sql = f"INSERT INTO `{table}` ({keys[0]},{keys[1]}) VALUES ({value},'{timestamp}');"
+                print(sql)
                 res = cursor.execute(sql)
                 result = cursor._last_executed
-                log.info(f"Update: {result}")
+                print(f"Rows Modified = {cursor.rowcount}")
+                log.info(f"Added TSL: {result}")
             except Exception as e:
-                log.error(f"Update TSL Error: {e}")
+                log.error(f"Error Adding TSL: {e}")
             finally:
                 cursor.close()
         else:
@@ -411,6 +458,7 @@ def updateTsl(value,timestamp):
                 sql = f"INSERT INTO `{table}`({keys[0]},{keys[1]}) VALUES ({value},'{timestamp}')"
                 cursor.execute(sql)
                 result = cursor._last_executed
+                print(f"Rows Modified = {cursor.rowcount}")
                 print(result)
             except Exception as e:
                 print(f"Insert TSL Error: {e}")
@@ -462,12 +510,48 @@ def fetchTsl():
 
         return tsl
 
-def checkBuySignal():
+def fetchInverseTrade():
+    global ticker
+    global database
+    global DB_HOST
+    global DB_PASS
+    global inverse_trade
+
+    table = f"ticker"
+    connection = pymysql.connect(host=DB_HOST,
+                             user='root',
+                             password=DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
+
+    with connection.cursor() as cursor:
+        if checkTableExists(table, cursor):
+            log.info("Fetching Inverse Trade value")
+            try:
+                sql = f"SELECT (inverse_trade) FROM `{table}`"
+                print(sql)
+                cursor.execute(sql)
+            except Exception as e:
+                log.error(f"Error fetching Inverse Trade value: {e}")
+            else:
+                res = cursor.fetchone()
+                #log.info(f"inverse_value is {res['inverse_trade']}")
+                if res['inverse_trade'] == 1:
+                    inverse_trade = True
+                else:
+                    inverse_trade = False
+                log.info(f"inverse_trade is {inverse_trade}")
+
+def checkBuySignal(live):
     global buy_signal_flag
     global buy_signal_count
     global sell_signal_count
     global signal
     global signal_count_limit
+    global inverse_table
+    global inverse_trade
 
     if buy_signal_count > signal_count_limit and sell_signal_count == 0 and buy_signal_flag == False: 
         #Crossover of live price over tsl and higher than last candle close
@@ -478,18 +562,44 @@ def checkBuySignal():
         sell_signal_count = 0
         buy_signal_flag = True
         sell_signal_flag = False
+        log.info(f"Live Price is {live}")
+        if inverse_trade and ticker in inverse_table:
+            inverse_ticker = inverse_table[ticker]
+            log.info(inverse_ticker)
+
+            data = {
+              "ticker": ticker,
+              "price": live,
+              "qty": 100,
+              "side": "buy",
+              "inverse_ticker": inverse_ticker
+            }
+        else:
+            data = {
+              "ticker": ticker,
+              "price": live,
+              "qty": 100,
+              "side": "buy"
+            }
+        log.info(data)
+        sendDiscordMessage(json.dumps(data))
+        sendWebhook(data)
+
     elif buy_signal_flag == False:
         sell_signal_flag = False
         sendDiscordMessage(f'Recieved Buy signal with count {buy_signal_count}')
         buy_signal_count = buy_signal_count + 1
         buy_signal_flag = False
         
-def checkSellSignal():
+def checkSellSignal(live):
     global sell_signal_flag
     global buy_signal_count
     global sell_signal_count
     global signal
     global signal_count_limit
+    global inverse_table
+    global inverse_trade
+    global ticker
 
     if sell_signal_count > signal_count_limit and buy_signal_count == 0 and sell_signal_flag == False: 
         #Crossunder of live price under tsl and lower than last candle close
@@ -500,6 +610,29 @@ def checkSellSignal():
         buy_signal_count = 0
         sell_signal_flag = True
         buy_signal_flag = False
+
+        if inverse_trade and ticker in inverse_table:
+            inverse_ticker = inverse_table[ticker]
+            log.info(inverse_ticker)
+
+            data = {
+              "ticker": ticker,
+              "price": live,
+              "qty": 100,
+              "side": "sell",
+              "inverse_ticker": inverse_ticker
+            }
+        else:
+            data = {
+              "ticker": ticker,
+              "price": live,
+              "qty": 100,
+              "side": "sell"
+            }
+        log.info(data)
+        sendDiscordMessage(data)
+        sendWebhook(data)
+
     elif sell_signal_flag == False :
         buy_signal_flag = False
         sendDiscordMessage(f'Recieved Sell signal with count {sell_signal_count}')
@@ -525,6 +658,7 @@ def calcTsl(data):
     global signal_count
     global sell_signal_flag
     global buy_signal_flag
+    global ticker
 
     table = f"{ticker}-live"
     signal_table = f"{ticker}-signal"
@@ -539,17 +673,21 @@ def calcTsl(data):
 
     connection.autocommit(True)
 
+    fetchInverseTrade()
+
     with connection.cursor() as cursor:
+        log.info(checkTableExists(table, cursor))
         if checkTableExists(table, cursor):
             try:
                 sql = f"SELECT * FROM `{table}`"
                 cursor.execute(sql)
                 res = cursor.fetchone()
-                live = res['price']
             except Exception as e:
                 raise(e)
+            else:
+                live = res['price']
 
-            log.info(live)
+            log.info(f"Live Price is {live}")
             if data is not None and live is not None:
                 #print(f'Live Price is {live}')
                 #print(f'TSL New Data is {data}')
@@ -620,11 +758,11 @@ def calcTsl(data):
 
                 if live > tsl and live > close and avn is not None:
                     print('Buy Signal!')
-                    checkBuySignal()
+                    checkBuySignal(live)
 
                 if live < tsl and live < close and avn is not None:
                     print('Sell Signal!')
-                    checkSellSignal()
+                    checkSellSignal(live)
 
                 if checkTableExists(signal_table, cursor):
                     try:
@@ -661,9 +799,10 @@ def calcTsl(data):
                 sql = f"CREATE TABLE IF NOT EXISTS `{table}` (`index` BIGINT, price FLOAT);"
                 cursor.execute(sql)
                 result = cursor._last_executed
-                print(f"Created: {result}")
             except Exception as e:
-                print(f"Create Live Table Error: {e}")
+                log.info(f"Error creating Live Table Error: {e}")
+            else:
+                log.info(f"Created Live Table: {result}")
 
 def fetchLastCandles(dbConnection):
     try:

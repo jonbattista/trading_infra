@@ -27,7 +27,7 @@ if DB_HOST is None:
 
 ticker = None
 database = "trades"
-
+timeframe = None
 first_run = True
 
 log = logging.getLogger()
@@ -54,6 +54,7 @@ def buildCandleDataFrame(live):
     global ticker
     global DB_HOST
     global DB_PASS
+    global timeframe
 
     sqlEngine = create_engine(f'mysql+pymysql://root:{DB_PASS}@{DB_HOST}/{database}', pool_recycle=3600)
     connection = pymysql.connect(host=DB_HOST,
@@ -113,11 +114,21 @@ def buildCandleDataFrame(live):
 
                     previous_time = data.at[index - 1,'t'].to_pydatetime()
                     print(previous_time)
-                    previous_minute = previous_time.minute
-                    current_minute = now_est.minute
+                    previous_timeframe = None
+                    current_timeframe = None
+                    log.info(f"Timeframe is {timeframe}")
+                    if timeframe is not None and timeframe:
+                        if timeframe == '30m':
+                            previous_timeframe = previous_time.minute
+                            current_timeframe = now_est.minute
+                        elif timeframe == '1h' or timeframe == '4h':
+                            previous_timeframe = previous_time.hour
+                            current_timeframe = now_est.hour
+                    else:
+                        log.error("Timeframe is not set!")
 
-                    print(f"Previous Timeframe is {previous_minute}")
-                    print(f"Current Timeframe is {current_minute}")
+                    print(f"Previous Timeframe is {previous_timeframe}")
+                    print(f"Current Timeframe is {current_timeframe}")
 
                     current_timeframe_string = now_est.strftime('%Y-%m-%d %H:%M:00')
 
@@ -190,7 +201,7 @@ def buildCandleDataFrame(live):
                     log.info(f"Table {ticker} is empty")
                     cursor.close()
             else:
-                log.info(f"Table {ticker} does not exist!")
+                log.info(f"Table {ticker} does not exist or is empty!")
                 cursor.close()
 
 def updateLatestPrice(price):
@@ -313,6 +324,7 @@ def fetchTicker(ws):
     global database
     global DB_HOST
     global DB_PASS
+    global timeframe
 
     old_ticker = ticker
     #print(f"old_ticker is {old_ticker}")
@@ -328,31 +340,34 @@ def fetchTicker(ws):
     with connection.cursor() as cursor:
         if checkTableExists(table, cursor):
             try:
-                sql = f"SELECT ticker FROM {table};"
+                sql = f"SELECT ticker, timeframe FROM {table};"
                 cursor.execute(sql)
                 res = cursor.fetchone()
             except Exception as e:
                 log.error(f"Error fetching Ticker: {e}")
+            else:
+                log.info(f"Response is {res}")
+                if ticker is None:
+                    ticker = res['ticker']
+                    log.info(f"Setting Ticker to {ticker}")
+            
+                if res['ticker'] is not None and old_ticker != res['ticker']:
+                    ticker = res['ticker']
+                    log.info(f"Updated Ticker from {old_ticker} to {ticker}")
+                    log.info("Ticker changed. Updating Websocket...")
+                    if old_ticker is not None:
+                        unsubscribeTicker(ws, old_ticker)
+                    if ticker is not None:
+                        subscribeTicker(ws, ticker)
+                if res['timeframe'] is not None:
+                    timeframe = res['timeframe']
+                print(f"Ticker is {ticker}")
             finally:
                 cursor.close()
-            #log.info(res)
-
-            if ticker is None:
-                ticker = res['ticker']
-                log.info(f"Set Ticker to {ticker}")
             
-            if res['ticker'] is not None and old_ticker != res['ticker']:
-                ticker = res['ticker']
-                log.info(f"Updated Ticker from {old_ticker} to {ticker}")
-                log.info("Ticker changed. Updating Websocket...")
-                if old_ticker is not None:
-                    unsubscribeTicker(ws, old_ticker)
-                if ticker is not None:
-                    subscribeTicker(ws, ticker)
-            print(f"Ticker is {ticker}")
         else:
             try:
-                sql = f"CREATE TABLE IF NOT EXISTS `{table}` (`index` BIGINT,ticker TEXT);"
+                sql = f"CREATE TABLE IF NOT EXISTS `{table}` (`index` BIGINT, ticker TEXT, inverse_trade BOOLEAN, timeframe TEXT, fake_sensitivity BIGINT);"
                 cursor.execute(sql)
                 result = cursor._last_executed
                 print(f"Created: {result}")
