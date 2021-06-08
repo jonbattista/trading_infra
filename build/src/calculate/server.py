@@ -279,47 +279,47 @@ def updateAvd(value,timestamp):
             finally:
                 cursor.close()
                     
-def fetchAvd():
-    global ticker
-    global database
-    global DB_HOST
-    global DB_PASS
+#def fetchAvd():
+#    global ticker
+#    global database
+#    global DB_HOST
+#    global DB_PASS#
 
-    avd = {}
-    key = "avd"
-    table = f"{ticker}-{key}"
-    connection = pymysql.connect(host=DB_HOST,
-                             user='root',
-                             password=DB_PASS,
-                             database=database,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor,
-                             autocommit=True)
-    with connection.cursor() as cursor:
-        if checkTableExists(table, cursor):
-            log.info("Fetching AVD")
-            try:
-                sql = f"SELECT (value) FROM `{table}`"
-                print(sql)
-                cursor.execute(sql)
-                values = [item['value'] for item in cursor.fetchall()]
-                log.info(f"Fetched: {values}")
-                avd['values'] = values
-            except Exception as e:
-                log.error(f"Fetch AVD Error: {e}")
+#    avd = {}
+#    key = "avd"
+#    table = f"{ticker}-{key}"
+#    connection = pymysql.connect(host=DB_HOST,
+#                             user='root',
+#                             password=DB_PASS,
+#                             database=database,
+#                             charset='utf8mb4',
+#                             cursorclass=pymysql.cursors.DictCursor,
+#                             autocommit=True)
+#    with connection.cursor() as cursor:
+#        if checkTableExists(table, cursor):
+#            log.info("Fetching AVD")
+#            try:
+#                sql = f"SELECT (value) FROM `{table}`"
+#                print(sql)
+#                cursor.execute(sql)
+#                values = [item['value'] for item in cursor.fetchall()]
+#                log.info(f"Fetched: {values}")
+#                avd['values'] = values
+#            except Exception as e:
+#                log.error(f"Fetch AVD Error: {e}")#
 
-            try:
-                sql = f"SELECT (timestamp) FROM `{table}`"
-                print(sql)
-                cursor.execute(sql)
-                timestamps = [item['timestamp'] for item in cursor.fetchall()]
-                log.info(f"Fetched: {timestamps}")
-                avd['timestamps'] = timestamps
-            except Exception as e:
-                log.error(f"Fetch AVD Error: {e}")
-        print(avd)
-        cursor.close()
-        return avd
+#            try:
+#                sql = f"SELECT (timestamp) FROM `{table}`"
+#                print(sql)
+#                cursor.execute(sql)
+#                timestamps = [item['timestamp'] for item in cursor.fetchall()]
+#                log.info(f"Fetched: {timestamps}")
+#                avd['timestamps'] = timestamps
+#            except Exception as e:
+#                log.error(f"Fetch AVD Error: {e}")
+#        print(avd)
+#        cursor.close()
+#        return avd
 
 def updateAvn(value,timestamp):
     global ticker
