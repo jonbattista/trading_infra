@@ -575,7 +575,7 @@ def fetchAlpacaCredentials():
                 if 'alpaca_key' in res and if 'alpaca_secret' in res:
                     return res['alpaca_key'], res['alpaca_secret']
                 else:
-                    log.error(f"Response was malformed! {res}")
+                    log.error(f"Alpaca Credential Response was malformed! {res}")
 
 def updateAlpacaCredentials(alpaca_key, alpaca_secret):
     global db_host
