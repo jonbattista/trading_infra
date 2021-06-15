@@ -16,6 +16,7 @@ import os
 from pytz import timezone, utc
 import websocket
 from time import sleep
+from discord import Webhook, RequestsWebhookAdapter
 
 tz = timezone('US/Eastern')
 now = datetime.now(tz)
@@ -100,7 +101,7 @@ def checkTableExists(table, cursor):
         if res is not None and 'COUNT(*)' in res and res['COUNT(*)'] > 0:
             return True
         else:
-            log.info(f"Table {table} is empty or doesnt not exist")
+            log.info(f"Table {table} is empty or does not exist")
             return False
 
 def fetchTicker(ws, database, db_user, db_pass, db_host):
@@ -127,7 +128,8 @@ def fetchTicker(ws, database, db_user, db_pass, db_host):
             except Exception as e:
                 log.error(f"Error fetching Ticker: {e}")
             else:
-                log.info(f"Response is {res}")
+                log.info(f"Trade Parameters are {res}")
+
                 if ticker is None:
                     ticker = res['ticker']
                     log.info(f"Setting Ticker to {ticker}")
@@ -189,27 +191,26 @@ def buildCandleDataFrame(ticker, database, db_user, db_pass, db_host, timeframe,
                          charset='utf8mb4',
                          cursorclass=pymysql.cursors.DictCursor,
                          autocommit=True)
-
     with connection.cursor() as cursor:
         with sqlEngine.connect() as dbConnection:
             if checkTableExists(ticker,cursor):
                 try:
                     data = pd.read_sql(f"SELECT * FROM `{ticker}`", dbConnection);
                 except Exception as e:
-                    raise(e)
+                    log.error(e)
+                else:
+                    if len(data.index) > 0:
 
-                df_len = len(data.index) 
-                #print(df_len)
-                print(data)
-                print(f"Dataframe Size is {df_len}")
+                        while len(data.index) > 5:
+                            i = data.index[0]
+                            data = data.drop(i)
+                            log.info(f"Dropped Dataframe Row at index: {i}")
 
-                if len(data.index) > 0:
+                    index = len(data.index) 
+                    #print(df_len)
+                    log.info(data)
+                    log.info(f"Dataframe Size is {index}")
 
-                    #while len(data.index) > 5:
-                    #    data = data.drop(data.index[0])
-
-                    print(data)
-                    index = df_len - 1
                     open_value = round(data['o'].iloc[-1], 2)
                     high_value = round(data['h'].iloc[-1], 2)
                     low_value = round(data['l'].iloc[-1], 2)
@@ -233,103 +234,158 @@ def buildCandleDataFrame(ticker, database, db_user, db_pass, db_host, timeframe,
                     tz = timezone('US/Eastern')
                     #date = datetime.now(tz)
                     now_utc = utc.localize(datetime.utcnow())
-                    #print(now_utc)
+                    print(f"Now UTC is {now_utc}")
                     now_est = now_utc.astimezone(tz)
-                    #print(now_est)
+                    print(f"Now EST is {now_est}")
 
-                    previous_time = data.at[index - 1,'t'].to_pydatetime()
-                    print(previous_time)
-                    previous_timeframe = None
-                    current_timeframe = None
-                    log.info(f"Timeframe is {timeframe}")
+                    try:
+                        #log.info(f"Previous is {data.at[index - 1, 't']}")
+                        previous_time = data.at[index -1,'t'].to_pydatetime()
+                    except Exception as e:
+                        log.error(e)
+                    else:
+                        print(f"T is {previous_time}")
+                    #previous_timeframe = None
+                    #current_timeframe = None
+                    print('bark')
+                    print(f"Websocket Timeframe is {timeframe}")
 
-                    if timeframe is not None and timeframe:
-                        if timeframe == '30m':
+                    if timeframe is not None:
+                        log.info('meow')
+                        if timeframe == '1':
                             previous_timeframe = previous_time.minute
                             current_timeframe = now_est.minute
-                        elif timeframe == '1h':
-                        elif timeframe == 'D':
+                            current_timeframe_string = now_est.strftime('%Y-%m-%d %H:%M:00')
+                        elif timeframe == '5':
+                            previous_timeframe = previous_time.minute
+                            current_timeframe = now_est.minute
+                            if current_minute.minute % 5 == 0:
+                                current_timeframe_string = now_est.strftime('%Y-%m-%d %H:%M:00')
+                            else:
+                                minute = 5 * round(current_minute.minute/5)
+                                current_timeframe_string = now_est.strftime('%Y-%m-%d %H:{minute}:00')
+                        elif timeframe == '15':
+                            previous_timeframe = previous_time.day
+                            current_timeframe = now_est.day
+                            if current_minute.minute % 15 == 0:
+                                current_timeframe_string = now_est.strftime('%Y-%m-%d %H:%M:00')
+                            else:
+                                minute = 15 * round(current_minute.minute/15)
+                                current_timeframe_string = now_est.strftime('%Y-%m-%d %H:{minute}:00')
+                        elif timeframe == '30':
+                            previous_timeframe = previous_time.minute
+                            current_timeframe = now_est.minute
+                            if current_minute.minute < 30:
+                                current_timeframe_string = now_est.strftime('%Y-%m-%d %H:00:00')
+                            else:
+                                current_timeframe_string = now_est.strftime('%Y-%m-%d %H:30:00')
+                        elif timeframe == '60':
                             previous_timeframe = previous_time.hour
                             current_timeframe = now_est.hour
-                    else:
-                        log.error("Timeframe is not set!")
+                            current_timeframe_string = now_est.strftime('%Y-%m-%d %H:00:00')
+                        elif timeframe == 'D':
+                            previous_timeframe = previous_time.day
+                            current_timeframe = now_est.day
+                            current_timeframe_string = now_est.strftime('%Y-%m-%d 20:00:00')
 
-                    print(f"Previous Timeframe is {previous_timeframe}")
-                    print(f"Current Timeframe is {current_timeframe}")
+                        log.info(f"Previous Timeframe is {previous_timeframe}")
+                        log.info(f"Current Timeframe is {current_timeframe}")
 
-                    current_timeframe_string = now_est.strftime('%Y-%m-%d %H:%M:00')
+                        # If the current timeframe value is different from the previous timeframe value
+                        # then add it to the table
+                        #if previous_timeframe != current_timeframe:
+#                            data.at[index,'index']=index
+#                            data.at[index,'o']=open_value
+#                            data.at[index,'h']=high_value
+#                            data.at[index,'l']=low_value
+#                            data.at[index,'c']=close_value
+#                            data.at[index,'v']=0
+#                            data.at[index,'t']=current_timeframe_string
 
-#                    if current_minute > previous_minute:
-#                        i = df_len
-#                        #new_row = pd.DataFrame([(i, close_value, high_value, low_value, open_value, 'ok', current_minute_string, 0)], index=[i], columns=('index','c','h','l','o','s','t','v'))
-#                        #print(new_row)
-#                        #data = data.append(new_row)
-#                        #print(data)
-#                        #data = data.drop(data.index[0])
-#                        #print(data)
-#                        keys = f"`index`= {i}, `c` = {close_value}, `h` = {high_value}, `l` = {low_value}, `o` = {open_value}, `s` = 'ok', `t` = '{current_minute_string}', `v` = 0"
-#                        try:
-#                            sql = f"INSERT INTO `{ticker}` SET {keys}"
-#                            print(sql)
-#                            #print(tuple(row))
-#                            cursor.execute(sql)
-#                            print(f"Rows Modified = {cursor.rowcount}")
-#                        except Exception as e:
-#                            log.info(e)
-#                    else:
-                    data.at[index,'index']=index
-                    data.at[index,'o']=open_value
-                    data.at[index,'h']=high_value
-                    data.at[index,'l']=low_value
-                    data.at[index,'c']=close_value
-                    data.at[index,'v']=0
-                    data.at[index,'t']=current_timeframe_string
+#                            values = ""
 
-                    log.info(data)
-                    cols = "`,`".join([str(i) for i in data.columns.tolist()])
-                    #print(f"Columns: {cols}")
+#                            for k, v in zip(data.columns.tolist(), tuple(data.iloc[index - 1])):
+#                                #print(k)
+#                                #print(v)
+#                                if k != "index":
+#                                    #values = values + f"'{v}', "
+#                                    values = values + f"`{k}` = '{v}', "
 
-                    # Insert DataFrame recrds one by one.
-                    for i,row in data.iterrows():
-                        #print(f"index: {i}")
-                        #print(f"Row: {row}")
-                        #values = "`,`".join([str(i) for i in row])
-                        #print(values)
-                        keys = ""
+                            #values = values[:-2]
+                            #values = f"'{close_value}', '{high_value}', '{low_value}', '{open_value}', 'ok', '{current_timeframe_string}', {0}"
+                        values = f"`c` = '{close_value}', `h` = '{high_value}', `l` = '{low_value}', `o` = '{open_value}', `s` = 'ok', `t` = '{current_timeframe_string}', `v` = '0.0'"
+                        
+                        log.info(f"Values are: {values}")
 
-                        for k, v in zip(data.columns.tolist(), tuple(row)):
-                            #print(k)
-                            #print(v)
-                            if k != "index":
-                                keys = keys + f"`{k}` = '{v}', "
-
-                        keys = keys[:-2]
-
-                        print(f"Keys {keys}")
                         try:
-                            sql = f"UPDATE `{ticker}` SET {keys} WHERE `index` = {i}"
-                            #print(sql)
-                            #print(tuple(row))
+                            #sql = f"INSERT INTO `{ticker}` VALUES ({index+1}, {values})"
+                            sql = f"UPDATE `{ticker}` SET {values} WHERE `index` = {index}"
+                            log.info(sql)
                             cursor.execute(sql)
-                            print(f"Rows Modified = {cursor.rowcount}")
                         except Exception as e:
                             log.info(e)
-                    try:
-                        new_table = pd.read_sql(f"SELECT * FROM `{ticker}`", dbConnection);
-                    except Exception as e:
-                        log.info(e)
+                        else:
+                            log.info(f"Successfully added row {values} to table {ticker}")
+                            log.info(f"Rows Modified = {cursor.rowcount}")
+                        # If the current timeframe value is the same as the previous timeframe value
+                        # and the Close price is different, then update the table row
+                        #else:
 
-                    pd.set_option('display.expand_frame_repr', False)
-                    
-                    log.info(f"Updated Table is {new_table}")
-                    cursor.close()
+#                            data.at[index,'index']=index
+#                            data.at[index,'o']=open_value
+#                            data.at[index,'h']=high_value
+#                            data.at[index,'l']=low_value
+#                            data.at[index,'c']=close_value
+#                            data.at[index,'v']=0
+#                            data.at[index,'t']=current_timeframe_string
 
-                else:
-                    log.info(f"Table {ticker} is empty")
-                    cursor.close()
+#                            log.info(data)
+#                            cols = "`,`".join([str(i) for i in data.columns.tolist()])
+                            #print(f"Columns: {cols}")
+
+                            # Insert DataFrame recrds one by one.
+#                            for i,row in data.iterrows():
+#                                #print(f"index: {i}")
+#                                #print(f"Row: {row}")
+#                                #values = "`,`".join([str(i) for i in row])
+#                                #print(values)
+#                                keys = ""#
+
+#                                for k, v in zip(data.columns.tolist(), tuple(row)):
+#                                    #print(k)
+#                                    #print(v)
+#                                    if k != "index":
+#                                        keys = keys + f"`{k}` = '{v}', "#
+
+#                                keys = keys[:-2]
+#                                log.info(f"Keys are: {keys}")#
+#                                values = f"`c` = '{close_value}', `h` = '{high_value}', `l` = '{low_value}', `o` = '{open_value}', `s` = 'ok', `t` = '{current_timeframe_string}', `v` = '0.0'"
+#                            
+#                                log.info(f"Values are: {values}")
+
+#                                try:
+#                                    sql = f"UPDATE `{ticker}` SET {keys} WHERE `index` = {index}"
+#                                    cursor.execute(sql)
+#                                except Exception as e:
+#                                    log.info(e)
+#                                else:
+#                                    log.info(f"Successfully updated table {ticker} with value {keys}")
+#                                    log.info(f"Rows Modified = {cursor.rowcount}")
+#                            try:
+#                                new_table = pd.read_sql(f"SELECT * FROM `{ticker}`", dbConnection);
+#                            except Exception as e:
+#                                log.info(e)#
+
+#                            pd.set_option('display.expand_frame_repr', False)
+#                            
+#                            log.info(f"Updated Table is {new_table}")
+#                            cursor.close()
+
+                    else:
+                        log.error("Timeframe is not set!")
             else:
-                log.info(f"Table {ticker} does not exist or is empty!")
-                cursor.close()
+                log.error(f"Error: Table {ticker} does not exist or is empty!")
+                log.error(f"It will be created on next Historical Job run.")
 
 def updateLatestPrice(database, db_user, db_pass, db_host, price):
     table = f"{ticker}-live"
@@ -406,10 +462,10 @@ def on_message(ws, message):
 
     ticker, timeframe, fake_sensitivity, use_inverse_trade, old_ticker = fetchTicker(ws, database, db_user, db_pass, db_host)
 
-    if old_ticker is not None and ws is not None:
+    if old_ticker is not None and ws is not None and old_ticker != ticker:
         unsubscribeTicker(ws, old_ticker)
 
-    if ticker is not None and ws is not None:
+    if ticker is not None and ws is not None and old_ticker != ticker:
         subscribeTicker(ws, ticker)
 
     res = json.loads(message)
@@ -452,20 +508,50 @@ def on_open(ws):
 
     subscribeTicker(ws,ticker)
 
-def sendTradeWebhook(ticker, data):
-    global APCA_API_KEY_ID
-    global APCA_API_SECRET_KEY
+def fetchAlpacaCredentials():
+    global db_host
+    global db_user
+    global db_pass
+    global database
 
-    if APCA_API_KEY_ID[0:2] == 'PK':
-        api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://paper-api.alpaca.markets')
+    connection = pymysql.connect(host=db_host,
+                         user=db_user,
+                         password=db_pass,
+                         database=database,
+                         charset='utf8mb4',
+                         cursorclass=pymysql.cursors.DictCursor,
+                         autocommit=True)
+    table = 'credentials'
+    with connection.cursor() as cursor:
+
+        if checkTableExists(table, cursor):
+            try:
+                sql = f"SELECT alpaca_key, alpaca_secret, FROM {table};"
+                cursor.execute(sql)
+                res = cursor.fetchone()
+            except Exception as e:
+                log.error(f"Error fetching Credentials: {e}")
+            else:
+                log.info(f"Credentials Response was {res}")
+
+                if 'alpaca_key' in res and 'alpaca_secret' in res:
+                    return res['alpaca_key'], res['alpaca_secret']
+                else:
+                    log.error("Credentials response was malformed!")
+
+def sendTradeWebhook(ticker, data):
+    alpaca_key, alpaca_secret = fetchAlpacaCredentials()
+
+    if alpaca_key[0:2] == 'PK':
+        api = tradeapi.REST(alpaca_key, alpaca_secret, 'https://paper-api.alpaca.markets')
         log.info('Using AlpacaPaper Trading API')
-    elif APCA_API_KEY_ID[0:2] == 'AK':
-        api = tradeapi.REST(APCA_API_KEY_ID, APCA_API_SECRET_KEY, 'https://api.alpaca.markets')
+    elif alpaca_key[0:2] == 'AK':
+        api = tradeapi.REST(alpaca_key, alpaca_secret, 'https://api.alpaca.markets')
         log.info('Using Alpaca Live Trading API')
     else:
-        log.error(f'Error: API Key {APCA_API_KEY_ID} is malformed.')
-        sendDiscordMessage(f'Error: API Key {APCA_API_KEY_ID} is malformed.')
-        return 'Error: API Key {user} is malformed.', 400
+        log.error(f'Error: API Key {alpaca_key} is malformed.')
+        sendDiscordMessage(f'Error: API Key {alpaca_key} is malformed.')
+
     try:
         order = api.submit_order(
                     symbol=ticker,
@@ -748,9 +834,9 @@ def executeTrade(ticker, live, side, use_inverse_trade):
 
     log.info(data)
     sendDiscordMessage(data)
-    sendTradeWebhook(data)
+    sendTradeWebhook(ticker, data)
 
-def checkBuySignal(live):
+def checkBuySignal(live, use_inverse_trade):
     global buy_signal_flag
     global buy_signal_count
     global sell_signal_count
@@ -1013,7 +1099,7 @@ def dropTables(ticker, database, db_user, db_pass, db_host):
 
         cursor.close()
 
-def getPreviousTimeframe(cursor, ticker,):
+def getTimeframe(cursor, ticker, diff):
     try:
         sql = f"SELECT COUNT(*) FROM `{ticker}`;"
         log.info(sql)
@@ -1025,15 +1111,18 @@ def getPreviousTimeframe(cursor, ticker,):
         log.info(count)
 
     try:
-        sql = f"SELECT t FROM `{ticker}` where `index` = {count['COUNT(*)'] - 2};"
+        sql = f"SELECT t FROM `{ticker}` where `index` = {count['COUNT(*)'] - diff};"
         print(sql)
         cursor.execute(sql)
         res = cursor.fetchone()
     except Exception as e:
         log.error(f"Error fetching Previous Timeframe: {e}")
     else:
-        print(res['t'])
-        return res['t']
+        if res is not None and 't' in res:
+            log.info(res['t'])
+            return res['t']
+        else:
+            log.error(f"Res is malformed!")
 
 #def fetchCurrentTimeframe(database, db_user, db_pass, db_host):#
 
@@ -1066,7 +1155,27 @@ def getPreviousTimeframe(cursor, ticker,):
 #        else:
 #            log.error("Ticker table does not exists or is empty!")
 
-def fetchHistoricalData(ticker, timeframe, database, db_user, db_host, db_pass):
+def dropRows(ticker, cursor):
+    try:
+        sql = f"SELECT COUNT(*) FROM `{ticker}`"
+        cursor.execute(sql)
+        res = cursor.fetchone()
+    except Exception as e:
+        log.error(e)
+    else:
+        #log.info(f"Table Count is {count}")
+        if res is not None and 'COUNT(*)' in res:
+            while res['COUNT(*)'] > 6:
+                try:
+                    sql = f"DELETE FROM `{ticker}` ORDER BY `index` LIMIT 1]"
+                    log.info(sql)
+                    cursor.execute(sql)
+                    res = cursor.fetchone()
+                except Exception as e:
+                    log.error(e)
+
+def fetchHistoricalData(database, db_user, db_host, db_pass):
+    ticker, timeframe, fake_sensitivity, use_inverse_trade, old_ticker = fetchTicker(None, database, db_user, db_pass, db_host)
 
     sqlEngine = create_engine(f'mysql+pymysql://{db_user}:{db_pass}@{db_host}/{database}', pool_recycle=3600)
 
@@ -1086,7 +1195,16 @@ def fetchHistoricalData(ticker, timeframe, database, db_user, db_host, db_pass):
 
     range = 5
 
-    if timeframe == '30':
+    if timeframe == '1':
+        log.info("Using 5m (5 x 1m intervals) difference")
+        diff = range * 60 * 1 + 55
+    elif timeframe == '5':
+        log.info("Using 25m (5 x 5m interval) difference")
+        diff = range * 60 * 5 + 55
+    elif timeframe == '15':
+        log.info("Using 75m (5 x 15m interval) difference")
+        diff = range * 60 * 15 + 55
+    elif timeframe == '30':
         log.info("Using 150m (5 x 30m intervals) difference")
         diff = range * 60 * 30 + 55
     elif timeframe == '60':
@@ -1113,7 +1231,7 @@ def fetchHistoricalData(ticker, timeframe, database, db_user, db_host, db_pass):
 
     res = requests.get(url)
     data = res.json()
-    #log.info(f"Data is {data}")
+    log.info(f"Historical JSON was {data}")
 
     if 's' in data and data['s'] == 'no_data':
         log.error(f"Finnhub JSON Response was {data}")
@@ -1127,12 +1245,12 @@ def fetchHistoricalData(ticker, timeframe, database, db_user, db_host, db_pass):
             timestamps[index] = new_timestamp.strftime(fmt)
 
         #print(data['t'])
-        df = pd.DataFrame.from_dict(data)
+        dataframe = pd.DataFrame.from_dict(data)
 
-        print(f"DataFrame is {df}")
+        #print(f"DataFrame is {dataframe}")
 
-        index = len(df.index)
-        print(df.at[index - 1,'t'])
+        index = len(dataframe.index)
+        log.info(dataframe.at[index - 1,'t'])
         #date = datetime.now(tz)
         now_utc = utc.localize(datetime.utcnow())
         #print(now_utc)
@@ -1141,75 +1259,162 @@ def fetchHistoricalData(ticker, timeframe, database, db_user, db_host, db_pass):
         with connection.cursor() as cursor:
             with sqlEngine.connect() as dbConnection:
                 if checkTableExists(ticker, cursor):
+                    dropRows(ticker, dbConnection)
+
                     #previous_time = datetime.strptime(getPreviousTimeframe(cursor, ticker), '%Y-%m-%d %H:%M:%S')
-                    previous_time = getPreviousTimeframe(cursor, ticker)
-                    print(previous_time)
-                    previous_minute = previous_time.minute
+                    previous_time = getTimeframe(cursor, ticker, 2)
+                    last_time = getTimeframe(cursor, ticker, 1)
+
+                    log.info(f"Previous Timeframe is {previous_time}")
+
+                    if previous_time is not None and hasattr(previous_time, 'minute'):
+                        previous_minute = previous_time.minute
+
+                    if last_time is not None and hasattr(last_time, 'minute'):
+                        last_minute = last_time.minute
+
                     current_minute = now_est.minute
 
-                    print(f"Previous Minute is {previous_minute}")
-                    print(f"Current minute {current_minute}")
+                    if timeframe is not None:
+                        if timeframe == '1':
+                            previous_timeframe = previous_time.minute
+                            current_timeframe = now_est.minute
+                            current_timeframe_string = now_est.strftime('%Y-%m-%d %H:%M:00')
+                        elif timeframe == '5':
+                            previous_timeframe = previous_time.minute
+                            current_timeframe = now_est.minute
+                            if current_minute.minute % 5 == 0:
+                                current_timeframe_string = now_est.strftime('%Y-%m-%d %H:%M:00')
+                            else:
+                                minute = 5 * round(current_minute.minute/5)
+                                current_timeframe_string = now_est.strftime('%Y-%m-%d %H:{minute}:00')
+                        elif timeframe == '15':
+                            previous_timeframe = previous_time.day
+                            current_timeframe = now_est.day
+                            if current_minute.minute % 15 == 0:
+                                current_timeframe_string = now_est.strftime('%Y-%m-%d %H:%M:00')
+                            else:
+                                minute = 15 * round(current_minute.minute/15)
+                                current_timeframe_string = now_est.strftime('%Y-%m-%d %H:{minute}:00')
+                        elif timeframe == '30':
+                            previous_timeframe = previous_time.minute
+                            current_timeframe = now_est.minute
+                            if current_minute.minute < 30:
+                                current_timeframe_string = now_est.strftime('%Y-%m-%d %H:00:00')
+                            else:
+                                current_timeframe_string = now_est.strftime('%Y-%m-%d %H:30:00')
+                        elif timeframe == '60':
+                            previous_timeframe = previous_time.hour
+                            current_timeframe = now_est.hour
+                            current_timeframe_string = now_est.strftime('%Y-%m-%d %H:00:00')
+                        elif timeframe == 'D':
+                            previous_timeframe = previous_time.day
+                            current_timeframe = now_est.day
+                            current_timeframe_string = now_est.strftime('%Y-%m-%d 20:00:00')
 
-                    current_minute_string = now_est.strftime('%Y-%m-%d %H:%M:00')
-                    try:
-                        cols = "`,`".join([str(i) for i in df.columns.tolist()])
-                        print(f"Columns: {cols}")
+                    log.info(f"Previous Minute is {previous_minute}")
+                    log.info(f"Last Minute is {last_minute}")
+                    log.info(f"Current minute {current_minute}")
+                    log.info(f"Current Timefram String is {current_timeframe_string}")
 
-                        if current_minute != previous_minute:
+                    if current_minute != previous_minute and current_minute != last_minute:
+                        try:
+                            cols = "`,`".join([str(i) for i in dataframe.columns.tolist()])
+                            print(f"Dataframe Columns: {cols}")
+
                             # Insert DataFrame recrds one by one.
-                            for i,row in df.iterrows():
-                                keys = ""
-                                #print(f"index: {i}")
-                                #print(f"Row: {row}")
+                            for i,row in dataframe.iterrows():
 
-                                for k, v in zip(df.columns.tolist(), tuple(row)):
-                                    #print(k)
-                                    #print(v)
+                                keys = ""
+
+                                for k, v in zip(dataframe.columns.tolist(), tuple(row)):
                                     if k != "index":
                                         keys = keys + f"`{k}` = '{v}', "
                                 keys = keys[:-2]
 
                                 print(f"Keys/Values are {keys}")
+                                i = i - 1
 
-                                try:
-                                    #sql = f"UPDATE `{ticker}` SET {keys} WHERE `index` = {i}"
-                                    sql = f"INSERT INTO `{ticker}` (`index`,c,h,l,o,s,t,v) VALUES ({i},{tuple(row)[0]},{tuple(row)[1]},{tuple(row)[2]},{tuple(row)[3]},'{tuple(row)[4]}','{tuple(row)[5]}',{tuple(row)[6]}) ON DUPLICATE KEY UPDATE {keys};"
-
-                                    print(sql)
-                                    cursor.execute(sql)
-                                    print(f"Rows Modified = {cursor.rowcount}")
-                                    result = cursor._last_executed
-                                    #print(result)
-                                except Exception as e:
-                                    print(e)
-                                try:
-                                    new_table = pd.read_sql(f"SELECT * FROM `{ticker}`", dbConnection);
-                                except Exception as e:
-                                    print(e)
-
-                                pd.set_option('display.expand_frame_repr', False)
-                                
-                    except ValueError as vx:
-                        print(vx)
-                    except Exception as ex:   
-                        print(ex)
+                                if i >= 0:
+                                    try:
+                                        #sql = f"UPDATE `{ticker}` SET {keys} WHERE `index` = {i}"
+                                        sql = f"INSERT INTO `{ticker}` (`index`,c,h,l,o,s,t,v) VALUES ({i},{tuple(row)[0]},{tuple(row)[1]},{tuple(row)[2]},{tuple(row)[3]},'{tuple(row)[4]}','{tuple(row)[5]}',{tuple(row)[6]}) ON DUPLICATE KEY UPDATE {keys};"
+                                        log.info(sql)
+                                        cursor.execute(sql)
+                                    except Exception as e:
+                                        log.error(e)
+                                    else:
+                                        log.info(f"Rows Modified = {cursor.rowcount}")
+                                        result = cursor._last_executed
+                                        log.info(f"Sucessfully update table: {result}")
+                                    
+                        except ValueError as vx:
+                            print(vx)
+                        except Exception as ex:   
+                            print(ex)
+                        else:
+                            print(f"Table {ticker} updated.");
                     else:
-                        print(f"Table {ticker} updated.");
+                        try:
+                            cols = "`,`".join([str(i) for i in dataframe.columns.tolist()])
+                            log.info(f"Dataframe Columns: {cols}")
+
+                            # Insert DataFrame recrds one by one.
+                            for i, row in dataframe.iterrows():
+
+                                keys = ""
+
+                                for k, v in zip(dataframe.columns.tolist(), tuple(row)):
+                                    if k != "index":
+                                        keys = keys + f"`{k}` = '{v}', "
+                                keys = keys[:-2]
+
+                                print(f"Keys/Values are {keys}")
+                                
+                                if i >= 0:
+                                    try:
+                                        #sql = f"UPDATE `{ticker}` SET {keys} WHERE `index` = {i}"
+                                        sql = f"INSERT INTO `{ticker}` (`index`,c,h,l,o,s,t,v) VALUES ({i},{tuple(row)[0]},{tuple(row)[1]},{tuple(row)[2]},{tuple(row)[3]},'{tuple(row)[4]}','{tuple(row)[5]}',{tuple(row)[6]}) ON DUPLICATE KEY UPDATE {keys};"
+                                        log.info(sql)
+                                        cursor.execute(sql)
+                                    except Exception as e:
+                                        log.error(e)
+                                    else:
+                                        log.info(f"Rows Modified = {cursor.rowcount}")
+                                        result = cursor._last_executed
+                                        log.info(f"Sucessfully update table: {result}")
+                                    
+                        except ValueError as vx:
+                            print(vx)
+                        except Exception as ex:   
+                            print(ex)
+                        else:
+                            print(f"Table {ticker} updated.");
                 else:
+                    log.info(f"Table {ticker} is empty or does not exist! Creating it now...")
+                    try:
+                        sql = f"DROP TABLE `{ticker}`;"
+                        res = cursor.execute(sql)
+                        result = cursor._last_executed
+                    except Exception as e:
+                        log.error(f"Error dropping Table {ticker}: {e}")
+                    else:
+                        log.info(f"Succesfully dropped Table {ticker}: {result}")
+
                     try:
                         sql = f"CREATE TABLE IF NOT EXISTS `{ticker}` (`index` BIGINT PRIMARY KEY, c DOUBLE, h DOUBLE, l DOUBLE, o DOUBLE, s TEXT, t DATETIME, v DOUBLE);"
                         cursor.execute(sql)
                         result = cursor._last_executed
-                        print(f"Create: {result}")
+                        log.info(f"Successfully created Table {ticker}: {result}")
                     except Exception as e:
-                        print(f"Create Error: {e}")
+                        log.error(f"Error creating Table {ticker}: {e}")
 
-                    for i,row in df.iterrows():
+                    for i,row in dataframe.iterrows():
                             keys = ""
                             #print(f"index: {i}")
                             #print(f"Row: {row}")
 
-                            for k, v in zip(df.columns.tolist(), tuple(row)):
+                            for k, v in zip(dataframe.columns.tolist(), tuple(row)):
                                 #print(k)
                                 #print(v)
                                 if k != "index":
@@ -1226,11 +1431,10 @@ def fetchHistoricalData(ticker, timeframe, database, db_user, db_host, db_pass):
                                 print(f"Insert Error: {e}")
                 try:
                     table = pd.read_sql(f"select * from `{ticker}`", dbConnection);
-                except Exception as ex:   
-                    print(ex)
-                    fetchHistoricalData()
+                except Exception as e:   
+                    log.error(e)
                 else:
-                    print(f"Historical Table is {table}")
+                    log.info(f"Historical Table is {table}")
                 finally:
                     cursor.close()
     else:
@@ -1257,11 +1461,11 @@ def startHistorical():
 
     dropTables(ticker, database, db_user, db_pass, db_host)
 
-    fetchHistoricalData(ticker, timeframe, database, db_user, db_host, db_pass)
+    fetchHistoricalData(database, db_user, db_host, db_pass)
 
     print("Scheduling Historical Fetch Job!")
     sched = BlockingScheduler()
-    sched.add_job(fetchHistoricalData, 'cron', args=[ticker, timeframe, database, db_user, db_host, db_pass],  minute='0-59', second='*/5')
+    sched.add_job(fetchHistoricalData, 'cron', args=[database, db_user, db_host, db_pass], minute='0-59', second='5')
     sched.start()
 
 def startCalculate():
@@ -1273,7 +1477,7 @@ def startCalculate():
     ticker, timeframe, fake_sensitivity, use_inverse_trade, old_ticker = fetchTicker(None, database, db_user, db_pass, db_host)
 
     sched = BlockingScheduler()
-    sched.add_job(calculateSignal, 'interval', args=[ticker, database, db_user, db_pass, db_host, timeframe, fake_sensitivity, use_inverse_trade], seconds=3)
+    sched.add_job(calculateSignal, 'interval', args=[ticker, database, db_user, db_pass, db_host, timeframe, fake_sensitivity, use_inverse_trade], seconds=5)
     sched.start()
 
 def main():

@@ -25,14 +25,7 @@ import dash_auth
 import os
 from pytz import timezone
 
-load_dotenv()
-
-DB_PASS = os.environ.get("DB_PASS")
-FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
-DB_HOST = os.environ.get("DB_HOST")
-
-if DB_HOST is None:
-    DB_HOST = "127.0.0.1"
+db_user = 'root'
 
 tz = timezone('US/Eastern')
 now = datetime.now(tz)
@@ -80,61 +73,60 @@ def fetchTicker():
 
     old_ticker = ticker
 
-    if ticker is not None and ticker:
-        #print(f"old_ticker is {old_ticker}")
-        table = 'ticker'
-        connection = pymysql.connect(host=DB_HOST,
-                                 user='root',
-                                 password=DB_PASS,
-                                 database=database,
-                                 charset='utf8mb4',
-                                 cursorclass=pymysql.cursors.DictCursor,
-                                 autocommit=True)
+    #print(f"old_ticker is {old_ticker}")
+    table = 'ticker'
+    connection = pymysql.connect(host=DB_HOST,
+                             user='root',
+                             password=DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
 
-        with connection.cursor() as cursor:
-            if checkTableExists(table, cursor):
-                try:
-                    sql = f"SELECT ticker FROM {table};"
-                    cursor.execute(sql)
-                    res = cursor.fetchone()
-                except Exception as e:
-                    log.error(f"Error fetching Ticker: {e}")
-                else:
-                    log.info(res)
-                finally:
-                    cursor.close()
-
-                ticker_value = res['ticker']
-                log.info(res)
-                print(bool(ticker_value))
-
-                if ticker is None and ticker_value:
-                    ticker = ticker_value
-                    log.info(f"Set Ticker to {ticker}")
-                
-                if ticker_value and ticker_value is not None and old_ticker != res['ticker']:
-                    ticker = ticker_value
-                    log.info(f"Updated Ticker from {old_ticker} to {ticker}")
+    with connection.cursor() as cursor:
+        if checkTableExists(table, cursor):
+            try:
+                sql = f"SELECT ticker FROM {table};"
+                cursor.execute(sql)
+                res = cursor.fetchone()
+            except Exception as e:
+                log.error(f"Error fetching Ticker: {e}")
             else:
-                try:
-                    sql = f"CREATE TABLE IF NOT EXISTS `ticker` (`index` BIGINT, ticker TEXT, inverse_trade BOOLEAN, timeframe TEXT, fake_sensitivity BIGINT);"
-                    cursor.execute(sql)
-                    result = cursor._last_executed
-                except Exception as e:
-                    print(f"Error createing Ticker Table: {e}")
-                else:
-                    log.info(f"Created Ticker Table: {result}")
-
-                try:
-                    sql = f"INSERT INTO `{table}` (`index`,ticker) VALUES (0,'{ticker}')"
-                    cursor.execute(sql)
-                    result = cursor._last_executed
-                except Exception as e:
-                     log.info(f"Error inserting into Ticker Table: {e}")
-                else:
-                    log.info(f"Inserted into Ticker Table: {result}")
-                
+                log.info(res)
+            finally:
                 cursor.close()
+
+            ticker_value = res['ticker']
+            log.info(res)
+            print(bool(ticker_value))
+
+            if ticker is None and ticker_value:
+                ticker = ticker_value
+                log.info(f"Set Ticker to {ticker}")
+            
+            if ticker_value and ticker_value is not None and old_ticker != res['ticker']:
+                ticker = ticker_value
+                log.info(f"Updated Ticker from {old_ticker} to {ticker}")
+        else:
+            try:
+                sql = f"CREATE TABLE IF NOT EXISTS `ticker` (`index` BIGINT, ticker TEXT, inverse_trade BOOLEAN, timeframe TEXT, fake_sensitivity BIGINT);"
+                cursor.execute(sql)
+                result = cursor._last_executed
+            except Exception as e:
+                print(f"Error createing Ticker Table: {e}")
+            else:
+                log.info(f"Created Ticker Table: {result}")
+
+            try:
+                sql = f"INSERT INTO `{table}` (`index`,ticker) VALUES (0,'{ticker}')"
+                cursor.execute(sql)
+                result = cursor._last_executed
+            except Exception as e:
+                 log.info(f"Error inserting into Ticker Table: {e}")
+            else:
+                log.info(f"Inserted into Ticker Table: {result}")
+            
+            cursor.close()
 
 def sendDiscordMessage(message):
     url = "https://discord.com/api/webhooks/831890918796820510/OWR1HucrnJzHdTE-vASdf5EIbPC1axPikD4D5lh0VBn413nARUW4mla3xPjZHWCK9-9P"
@@ -542,22 +534,98 @@ def fetchTsl():
         return tsl
 
 def fetchLastCandles(dbConnection, ticker):
+    data = None
     if ticker is not None and ticker:
         try:
             data = pd.read_sql_query(f"SELECT * FROM `{ticker}`", dbConnection);
         except Exception as e:
             log.error(e)
+
         finally:
             dbConnection.close()
 
         pd.set_option('display.expand_frame_repr', False)
         #print(f"Fetched Table: {data}")
+        if data is not None:   
+            return data
 
-        return data
+def fetchAlpacaCredentials():
+    global db_host
+    global db_user
+    global db_pass
+    global database
 
+    connection = pymysql.connect(host=db_host,
+                         user=db_user,
+                         password=db_pass,
+                         database=database,
+                         charset='utf8mb4',
+                         cursorclass=pymysql.cursors.DictCursor,
+                         autocommit=True)
+    with connection.cursor() as cursor:
+        # Create / Update Ticker table value
+        if checkTableExists('credentials', cursor):
+            try:
+                sql = f"SELECT alpaca_key, alpaca_secret FROM `credentials`"
+                cursor.execute(sql)
+                res = cursor.fetchone()
+            except Exception as e:
+                log.error(e)
+            else:
+                if 'alpaca_key' in res and if 'alpaca_secret' in res:
+                    return res['alpaca_key'], res['alpaca_secret']
+                else:
+                    log.error(f"Response was malformed! {res}")
 
+def updateAlpacaCredentials(alpaca_key, alpaca_secret):
+    global db_host
+    global db_user
+    global db_pass
+    global database
 
+    connection = pymysql.connect(host=db_host,
+                         user=db_user,
+                         password=db_pass,
+                         database=database,
+                         charset='utf8mb4',
+                         cursorclass=pymysql.cursors.DictCursor,
+                         autocommit=True)
 
+    with connection.cursor() as cursor:
+        # Create / Update Ticker table value
+        if checkTableExists('credentials', cursor):
+            try:
+                sql = f"UPDATE `credentials` SET alpaca_key = '{alpaca_key}', alpaca_secret = '{alpaca_secret}'"
+                print(sql)
+                result = cursor._last_executed
+                cursor.execute(sql)
+                res = cursor.fetchone()
+            except Exception as e:
+                log.error(f"Error updating Credentials: {e}")
+            else:
+                log.info(f"Updated Credentials table: {result}")
+        else:
+            try:
+                sql = f"CREATE TABLE IF NOT EXISTS `credentials` (alpaca_key TEXT, alpaca_secret TEXT);"
+                log.info(log.info)
+                cursor.execute(sql)
+                result = cursor._last_executed
+            except Exception as e:
+                log.error(f"Error creating Credentials Table: {e}")
+            else:
+                log.info(f"Created Credentials table: {result}")
+
+            try:
+                sql = f"INSERT INTO `credentials` (alpaca_key, alpaca_secret) VALUES ('{alpaca_key}','{alpaca_secret}')"
+                print(sql)
+                cursor.execute(sql)
+                result = cursor._last_executed
+            except Exception as e:
+                log.error(f"Error inserting into Credentials Table: {e}")
+            else:
+               log.info(f"Inserted Credentials table: {result}")
+            
+            cursor.close()
 
 app = dash.Dash(__name__,suppress_callback_exceptions=True)
 
@@ -579,18 +647,21 @@ def serve_layout():
             dcc.RadioItems(
                 id="timeframe-input",
                 options=[
-                    {'label': '1 Day', 'value': 'D'},
+                    {'label': '1m', 'value': '1'},
+                    {'label': '5m', 'value': '5'},
+                    {'label': '15m', 'value': '15'},
+                    {'label': '30m', 'value': '30'},
                     {'label': '1 Hour', 'value': '60'},
-                    {'label': '30m', 'value': '30'}
+                    {'label': '1 Day', 'value': 'D'}
                 ],
                 value=''
             ),
             dcc.RadioItems(
                 id="fake-sensitivity",
                 options=[
-                    {'label': 'Conservative - 20', 'value': '20'},
-                    {'label': 'Moderate - 15', 'value': '15'},
-                    {'label': 'Liberal - 5', 'value': '5'}
+                    {'label': 'Conservative', 'value': '0'},
+                    {'label': 'Moderate', 'value': '1'},
+                    {'label': 'Liberal', 'value': '2'}
                 ],
                 value=''
             ),
@@ -605,7 +676,23 @@ def serve_layout():
             html.Button('Submit', id='submit-ticker', n_clicks=0),
             html.Div(id='ticker-output',
                  children='Enter a value and press submit'),
+
         ]),
+        html.Div([
+            dcc.Input(
+                id="alpaca-key",
+                type="text",
+                placeholder="Alpaca API Key",
+            ),
+            dcc.Input(
+                id="alpaca-secret",
+                type="text",
+                placeholder="Alpaca API Secret",
+            ),
+            html.Button('Submit', id='submit-alpaca', n_clicks=0),
+            html.Div(id='alpaca-output',
+                 children='Enter a your Alpaca API Key and Secret'),
+        ]),   
         dcc.Graph(id = 'candles'),
         html.Div(id='metrics', style = {'display': 'flex', 'align-items': 'center', 'justify-content': 'center'}),
         html.Div([
@@ -660,7 +747,6 @@ def update_candles(n):
                                  charset='utf8mb4',
                                  cursorclass=pymysql.cursors.DictCursor,
                                  autocommit=True)
-        print('meow')
         with sqlEngine.connect() as dbConnection:
             with connection.cursor() as cursor:
                 if checkTableExists(live_table, cursor):
@@ -758,6 +844,12 @@ def update_avn(n):
     fig = go.Figure()
 
     avn = fetchAvn()
+
+    fig.update_layout(
+        title='AVN - Stores the last non-zero value of AVD.',
+        yaxis_title='AVN'
+    )
+
     if "values" in avn:
         last_avn = avn["values"][-1]
 
@@ -770,10 +862,7 @@ def update_avn(n):
 
             fig.add_trace(avn)
 
-            fig.update_layout(
-                title='AVN - Stores the last non-zero value of AVD.',
-                yaxis_title='AVN'
-            )
+
 
             fig.update_xaxes(
                 rangeslider_visible=True,
@@ -786,9 +875,9 @@ def update_avn(n):
             ))})
             return fig
         else:
-            return {}
+            return fig
     else:
-        return {}
+        return fig
 
 @app.callback(
     Output('avd', 'figure'),
@@ -892,9 +981,45 @@ def update_ticker(n_clicks, new_ticker, inverse_toggle_value_input, timeframe, f
     else:
         return f""
 
+@app.callback(
+    Output("alpaca-output", "children"),
+    Input('submit-alpaca', 'n_clicks'),
+    State('alpaca-key', 'value'),
+    State('alpaca-secret', 'value'),
+)
+def update_alpaca_api(n_clicks, alpaca_key, alpaca_secret):
+    global ticker
+    log.info(f"Alpaca API Key is {alpaca_key}")
+    log.info(f"Alpaca API Secret is {alpaca_secret}")
+
+    if alpaca_key is None:
+        log.error(f"Alpaca API Key is not set")
+        return f"Alpaca API Key is required!"
+
+    if alpaca_secret is None:
+        log.error(f"Alpaca API Secret is not set")
+    
+        return f"Alpaca API Secret is required!"
+
+    updateAlpacaCredentials(alpaca_key, alpaca_secret)
+
 if __name__ == '__main__':
-    if DB_PASS is not None or FINNHUB_API_KEY is not None:
-        app.run_server(debug=True, port=8080, use_reloader=True)
+    load_dotenv()
+
+    db_pass = os.environ.get("DB_PASS")
+
+    finnhub_api_key = os.environ.get("FINNHUB_API_KEY")
+
+    db_host = os.environ.get("DB_HOST")
+
+    if db_host is None:
+        db_host = "127.0.0.1"
+
+    if db_pass is None:
+        log.error(f"db_pass is not set!")
+    elif finnhub_api_key is None:
+        log.error(f"finnhub_api_key is not set!")
     else:
-        log.error(f"DB_PASS or FINNHUB_API_KEY is not set!")
+        app.run_server(debug=False, port=8080, use_reloader=False)
+
 
