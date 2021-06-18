@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:5.7
+    command: [ "--wait_timeout=80000", 
+    "--interactive_timeout=60000",
+    "--default_storage_engine=INNODB",
+    "--explicit_defaults_for_timestamp",
+    "--max_allowed_packet=1073741824",
+    "--net_read_timeout=31536000",
+    "--max_connections=10000",
+    "--net_write_timeout=80000",
+    "--net_read_timeout=80000" ]
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./mysql-init-files:/docker-entrypoint-initdb.d
+      - "mysql-log:/var/log/mysql"
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: help123
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_DATABASE: trades
+      MYSQL_USER: lionheart
+      MYSQL_PASSWORD: ZVyWpvhexfWyonfFnEvbBozCgChyjoKLgi
+    ports:
+      - "3306:3306"
+    
+  trading-backend:
+    depends_on:
+      - mysql
+    links: 
+      - mysql:mysql
+    image: gcr.io/trading-309422/trading-backend:latest
+    restart: always
+    environment:
+      MYSQL_PASSWORD: ZVyWpvhexfWyonfFnEvbBozCgChyjoKLgi
+      FINNHUB_API_KEY:
+
+  trading-ui:
+    depends_on:
+      - mysql
+    links: 
+      - mysql:mysql
+    image: gcr.io/trading-309422/trading-ui:latest
+    ports:
+      - "80:8080"
+    restart: always
+    environment:
+      MYSQL_PASSWORD: ZVyWpvhexfWyonfFnEvbBozCgChyjoKLgi
+volumes:
+  db_data: {}
+  mysql-log:
+    driver: local

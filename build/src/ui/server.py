@@ -25,7 +25,9 @@ import dash_auth
 import os
 from pytz import timezone
 
-db_user = 'root'
+db_pass = 'ZVyWpvhexfWyonfFnEvbBozCgChyjoKLgi'
+db_user = 'lionheart'
+db_host = 'mysql'
 
 tz = timezone('US/Eastern')
 now = datetime.now(tz)
@@ -65,68 +67,74 @@ VALID_USERNAME_PASSWORD_PAIRS = {
     'lionheart': 'cleanandjerks'
 }
 
-def fetchTicker():
-    global ticker
-    global database
-    global DB_HOST
-    global DB_PASS
-
+def fetchTicker(ticker, database, db_host, db_pass):
     old_ticker = ticker
 
     #print(f"old_ticker is {old_ticker}")
     table = 'ticker'
-    connection = pymysql.connect(host=DB_HOST,
-                             user='root',
-                             password=DB_PASS,
-                             database=database,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor,
-                             autocommit=True)
+    try:
+        connection = pymysql.connect(host=db_host,
+                                 user=db_user,
+                                 password=db_pass,
+                                 database=database,
+                                 charset='utf8mb4',
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 autocommit=True)
+    except Exception as e:
+        log.error(e)
+    else:
+        with connection.cursor() as cursor:
+            if checkTableExists(table, connection):
+                try:
+                    sql = f"SELECT ticker FROM {table};"
+                    cursor.execute(sql)
+                    res = cursor.fetchone()
+                except Exception as e:
+                    log.error(f"Error fetching Ticker: {e}")
+                else:
+                    log.info(f"Ticker response was {res}")
 
-    with connection.cursor() as cursor:
-        if checkTableExists(table, cursor):
-            try:
-                sql = f"SELECT ticker FROM {table};"
-                cursor.execute(sql)
-                res = cursor.fetchone()
-            except Exception as e:
-                log.error(f"Error fetching Ticker: {e}")
+                    if 'ticker' in res:
+                        ticker_value = res['ticker']
+
+                    if ticker_value is None:
+                        log.error(f"Ticker Value is None")
+                    else:
+                        if ticker is None and ticker_value:
+                            ticker = ticker_value
+                            log.info(f"Set Ticker to {ticker}")
+                        
+                        if old_ticker != ticker_value:
+                            ticker = ticker_value
+                            log.info(f"Updated Ticker from {old_ticker} to {ticker}")
+                        else:
+                            log.info(f"Old Ticker: {old_ticker} and New Ticker: {ticker} are the same!")
+                    log.info(f"Old Ticker is {old_ticker}")
+                finally:
+                    cursor.close()
+                return ticker
             else:
-                log.info(res)
-            finally:
-                cursor.close()
+                if ticker is not None:
+                    try:
+                        sql = f"CREATE TABLE IF NOT EXISTS `ticker` (`index` BIGINT, ticker TEXT, inverse_trade BOOLEAN, timeframe TEXT, fake_sensitivity BIGINT);"
+                        cursor.execute(sql)
+                        result = cursor._last_executed
+                    except Exception as e:
+                        print(f"Error createing Ticker Table: {e}")
+                    else:
+                        log.info(f"Created Ticker Table: {result}")
 
-            ticker_value = res['ticker']
-            log.info(res)
-            print(bool(ticker_value))
-
-            if ticker is None and ticker_value:
-                ticker = ticker_value
-                log.info(f"Set Ticker to {ticker}")
-            
-            if ticker_value and ticker_value is not None and old_ticker != res['ticker']:
-                ticker = ticker_value
-                log.info(f"Updated Ticker from {old_ticker} to {ticker}")
-        else:
-            try:
-                sql = f"CREATE TABLE IF NOT EXISTS `ticker` (`index` BIGINT, ticker TEXT, inverse_trade BOOLEAN, timeframe TEXT, fake_sensitivity BIGINT);"
-                cursor.execute(sql)
-                result = cursor._last_executed
-            except Exception as e:
-                print(f"Error createing Ticker Table: {e}")
-            else:
-                log.info(f"Created Ticker Table: {result}")
-
-            try:
-                sql = f"INSERT INTO `{table}` (`index`,ticker) VALUES (0,'{ticker}')"
-                cursor.execute(sql)
-                result = cursor._last_executed
-            except Exception as e:
-                 log.info(f"Error inserting into Ticker Table: {e}")
-            else:
-                log.info(f"Inserted into Ticker Table: {result}")
-            
-            cursor.close()
+                    try:
+                        sql = f"INSERT INTO `{table}` (`index`,ticker) VALUES (0,'{ticker}')"
+                        cursor.execute(sql)
+                        result = cursor._last_executed
+                    except Exception as e:
+                         log.info(f"Error inserting into Ticker Table: {e}")
+                    else:
+                        log.info(f"Inserted into Ticker Table: {result}")
+                    
+                    cursor.close()
+                return None
 
 def sendDiscordMessage(message):
     url = "https://discord.com/api/webhooks/831890918796820510/OWR1HucrnJzHdTE-vASdf5EIbPC1axPikD4D5lh0VBn413nARUW4mla3xPjZHWCK9-9P"
@@ -139,23 +147,21 @@ def sendDiscordMessage(message):
         webhook = Webhook.from_url(debug_url, adapter=RequestsWebhookAdapter())
         webhook.send(message)
 
-def checkTableExists(table, cursor):
-    try:
-        sql = f"SELECT COUNT(*) FROM `{table}`"
-        cursor.execute(sql)
-        count = cursor.fetchone()
-    except Exception as e:
-        count = None     
-    
-    if count is not None and count['COUNT(*)'] > 0:
-        return True
-    else:
-        return False
+def checkTableExists(table, connection):
+    with connection.cursor() as cursor:
+        try:
+            sql = f"SELECT COUNT(*) FROM `{table}`"
+            cursor.execute(sql)
+            count = cursor.fetchone()
+        except Exception as e:
+            count = None     
+        
+        if count is not None and count['COUNT(*)'] > 0:
+            return True
+        else:
+            return False
 
-def dropTables(ticker):
-    global database
-    global DB_HOST
-    global DB_PASS
+def dropTables(connection, ticker):
 
     tables = (f"{ticker}",
         f"{ticker}-live",
@@ -165,32 +171,18 @@ def dropTables(ticker):
         f"{ticker}-signal"
     )
 
-    #print(f"Dropping tables {tables}")
-
-    connection = pymysql.connect(host=DB_HOST,
-                             user='root',
-                             password=DB_PASS,
-                             database=database,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor,
-                             autocommit=True)
-
     with connection.cursor() as cursor:
         for table in tables:
             try:
                 sql = f"DROP TABLE `{table}`;"
                 res = cursor.execute(sql)
                 result = cursor._last_executed
-                log.info(f"Dropped Table: {result}")
             except Exception as e:
                 log.error(f"Error dropping Table: {e}")
-    
-    cursor.close()
+            else:
+                log.info(f"Dropped Table {table}: {result}")
 
-def updateTicker(new_ticker, inverse_toggle_value, timeframe, fake_sensitivity):
-    global database
-    global DB_HOST
-    global DB_PASS
+def updateTicker( database, db_host, db_pass, db_user, new_ticker, inverse_toggle_value, timeframe, fake_sensitivity):
     global sup0
     global sup1
     global res0
@@ -208,339 +200,290 @@ def updateTicker(new_ticker, inverse_toggle_value, timeframe, fake_sensitivity):
     last_avn = None
     last_avd = None
     signal = None
-    print('bark')
-    dropTables(new_ticker)
+
     log.info(f"inverse_toggle_value is {inverse_toggle_value}")
     tables = {}
 
-    tables[f"{new_ticker}"] = {
-        "index": "BIGINT PRIMARY KEY",
-        "c": "DOUBLE",
-        "h": "DOUBLE",
-        "l": "DOUBLE",
-        "o": "DOUBLE",
-        "s": "TEXT",
-        "t": "DATETIME",
-        "v": "DOUBLE",
-    }
-    tables[f"{new_ticker}-live"] = { 
-        "index": "INT",
-        "price": "FLOAT"
-    }
-    tables[f"{new_ticker}-avn"] = {
-        "value": "DOUBLE",
-        "timestamp": "DATETIME"
-    }
-    tables[f"{new_ticker}-avd"] = {
-        "value": "DOUBLE",
-        "timestamp": "DATETIME"
-    }
-    tables[f"{new_ticker}-tsl"] = {
-        "value": "DOUBLE",
-        "timestamp": "DATETIME"
-    }
-    tables[f"{new_ticker}-signal"] = {
-        "index": "BIGINT",
-        "value": "TEXT"
-    }
+    if new_ticker is not None:
+        tables[f"{new_ticker}"] = {
+            "index": "BIGINT PRIMARY KEY",
+            "c": "DOUBLE",
+            "h": "DOUBLE",
+            "l": "DOUBLE",
+            "o": "DOUBLE",
+            "s": "TEXT",
+            "t": "DATETIME",
+            "v": "DOUBLE",
+        }
+        tables[f"{new_ticker}-live"] = { 
+            "index": "INT",
+            "price": "FLOAT"
+        }
+        tables[f"{new_ticker}-avn"] = {
+            "value": "DOUBLE",
+            "timestamp": "DATETIME"
+        }
+        tables[f"{new_ticker}-avd"] = {
+            "value": "DOUBLE",
+            "timestamp": "DATETIME"
+        }
+        tables[f"{new_ticker}-tsl"] = {
+            "value": "DOUBLE",
+            "timestamp": "DATETIME"
+        }
+        tables[f"{new_ticker}-signal"] = {
+            "index": "BIGINT",
+            "value": "TEXT"
+        }
 
-    #print(f"Creaintg tables {tables}")
+        try:
+            connection = pymysql.connect(host=db_host,
+                                     user=db_user,
+                                     password=db_pass,
+                                     database=database,
+                                     charset='utf8mb4',
+                                     cursorclass=pymysql.cursors.DictCursor,
+                                     autocommit=True)
+        except Exception as e:
+            log.error(e)
+        else:
+            dropTables(connection, new_ticker)
 
-    connection = pymysql.connect(host=DB_HOST,
-                             user='root',
-                             password=DB_PASS,
-                             database=database,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor,
-                             autocommit=True)
+            for table in tables.keys():
+                key_values = ""
 
-    for table in tables.keys():
-        key_values = ""
-
-        for k in tables[table]:
-            val = f"`{k}` {tables[table][k]},"
-            key_values = key_values + val
+                for k in tables[table]:
+                    val = f"`{k}` {tables[table][k]},"
+                    key_values = key_values + val
 
 
-        with connection.cursor() as cursor:
-            # Create all tables for new Ticker
-            if not checkTableExists(table, cursor):
-                try:
-                    sql = f"CREATE TABLE IF NOT EXISTS `{table}` ({key_values[:-1]});"
-                    log.info(sql)
-                    cursor.execute(sql)
-                    result = cursor._last_executed
-                except Exception as e:
-                    log.error(f"Error creating Table {table}: {e}")
-                else:
-                    log.info(f"Created Table {table}: {result}")
+                with connection.cursor() as cursor:
+                    # Create all tables for new Ticker
+                    if not checkTableExists(table, connection):
+                        try:
+                            sql = f"CREATE TABLE IF NOT EXISTS `{table}` ({key_values[:-1]});"
+                            log.info(sql)
+                            cursor.execute(sql)
+                            result = cursor._last_executed
+                        except Exception as e:
+                            log.error(f"Error creating Table {table}: {e}")
+                        else:
+                            log.info(f"Created Table {table}: {result}")
 
-            # Create / Update Ticker table value
-            if checkTableExists('ticker', cursor):
-                try:
-                    sql = f"UPDATE `ticker` SET ticker = '{new_ticker}', inverse_trade = {inverse_toggle_value}, timeframe = '{timeframe}', fake_sensitivity = '{fake_sensitivity}' where `index` = 0"
-                    log.info(sql)
-                    result = cursor._last_executed
-                    cursor.execute(sql)
-                    res = cursor.fetchone()
-                except Exception as e:
-                    log.error(f"Error updating Ticker: {e}")
-                else:
-                    log.info(f"Updated Ticker table: {new_ticker} with {result}")
-                log.info(res)
+                    # Create / Update Ticker table value
+                    if checkTableExists('ticker', connection):
+                        try:
+                            sql = f"UPDATE `ticker` SET ticker = '{new_ticker}', inverse_trade = {inverse_toggle_value}, timeframe = '{timeframe}', fake_sensitivity = '{fake_sensitivity}' where `index` = 0"
+                            log.info(sql)
+                            result = cursor._last_executed
+                            cursor.execute(sql)
+                            res = cursor.fetchone()
+                        except Exception as e:
+                            log.error(f"Error updating Ticker: {e}")
+                        else:
+                            log.info(f"Updated Ticker table: {new_ticker} with {result}")
+                        log.info(res)
 
-                if res is not None:
-                    if new_ticker is None:
-                        new_ticker = res['ticker']
-                        log.info(f"Set Ticker to {new_ticker}")
-                    
-                    if res['ticker'] is not None and old_ticker != res['ticker']:
-                        new_ticker = res['ticker']
-                        log.info(f"Updated Ticker from {old_ticker} to {new_ticker}")
-                    print(f"Ticker is {new_ticker}")
-            else:
-                try:
-                    sql = f"CREATE TABLE IF NOT EXISTS `ticker` (`index` BIGINT, ticker TEXT, inverse_trade BOOLEAN, timeframe TEXT, fake_sensitivity BIGINT);"
-                    log.info(log.info)
-                    cursor.execute(sql)
-                    result = cursor._last_executed
-                except Exception as e:
-                    log.error(f"Error creating Ticker Table: {e}")
-                else:
-                    log.info(f"Created Ticker table: {result}")
+                        if res is not None:
+                            if new_ticker is None:
+                                new_ticker = res['ticker']
+                                log.info(f"Set Ticker to {new_ticker}")
+                            
+                            if res['ticker'] is not None and old_ticker != res['ticker']:
+                                new_ticker = res['ticker']
+                                log.info(f"Updated Ticker from {old_ticker} to {new_ticker}")
+                            print(f"Ticker is {new_ticker}")
+                    else:
+                        try:
+                            sql = f"CREATE TABLE IF NOT EXISTS `ticker` (`index` BIGINT, ticker TEXT, inverse_trade BOOLEAN, timeframe TEXT, fake_sensitivity BIGINT);"
+                            log.info(sql)
+                            cursor.execute(sql)
+                            result = cursor._last_executed
+                        except Exception as e:
+                            log.error(f"Error creating Ticker Table: {e}")
+                        else:
+                            log.info(f"Created Ticker table: {result}")
 
-                try:
-                    sql = f"INSERT INTO `ticker` (`index`,ticker) VALUES (0,'{new_ticker}')"
-                    log.info(sql)
-                    cursor.execute(sql)
-                    result = cursor._last_executed
-                except Exception as e:
-                    log.error(f"Error inserting into Ticker Table: {e}")
-                else:
-                   log.info(f"Inserted Ticker table: {result}")
+                        try:
+                            sql = f"INSERT INTO `ticker` (`index`,ticker) VALUES (0,'{new_ticker}')"
+                            log.info(sql)
+                            cursor.execute(sql)
+                            result = cursor._last_executed
+                        except Exception as e:
+                            log.error(f"Error inserting into Ticker Table: {e}")
+                        else:
+                           log.info(f"Inserted Ticker table: {result}")
 
-                try:
-                    sql = f"INSERT INTO `ticker` (`index`,inverse_trade) VALUES (0,{inverse_toggle_value})"
-                    log.info(sql)
-                    cursor.execute(sql)
-                    result = cursor._last_executed
-                except Exception as e:
-                    log.error(f"Error inserting Inverse value into Ticker Table: {e}")
-                else:
-                   log.info(f"Inserted Inverse value into Ticker table: {result}")
-                
-                cursor.close()
+                        try:
+                            sql = f"INSERT INTO `ticker` (`index`,inverse_trade) VALUES (0,{inverse_toggle_value})"
+                            log.info(sql)
+                            cursor.execute(sql)
+                            result = cursor._last_executed
+                        except Exception as e:
+                            log.error(f"Error inserting Inverse value into Ticker Table: {e}")
+                        else:
+                           log.info(f"Inserted Inverse value into Ticker table: {result}")
+                        
+                        cursor.close()
 
-def fetchSignal():
-    global ticker
-    global database
-    global DB_HOST
-    global DB_PASS
+def fetchSignal(connection, ticker):
     global signal
 
     table = f"{ticker}-signal"
-    connection = pymysql.connect(host=DB_HOST,
-                             user='root',
-                             password=DB_PASS,
-                             database=database,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor,
-                             autocommit=True)
 
     with connection.cursor() as cursor:
-        if checkTableExists(table, cursor):
+        if checkTableExists(table, connection):
             log.info("Fetching Signal")
             try:
                 sql = f"SELECT (value) FROM `{table}`"
                 print(sql)
                 cursor.execute(sql)
                 result = cursor.fetchone()
-                signal = result['value']
             except Exception as e:
                 log.error(f"Fetch Signal Error: {e}")
+            else:
+                if 'value' in result:
+                    signal = result['value']
             finally:
                 cursor.close()
 
-def fetchAvd():
-    global ticker
-    global database
-    global DB_HOST
-    global DB_PASS
-
+def fetchAvd(ticker, database, db_host, db_pass, db_user):
     avd = {}
     key = "avd"
     table = f"{ticker}-{key}"
-    connection = pymysql.connect(host=DB_HOST,
-                             user='root',
-                             password=DB_PASS,
-                             database=database,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor,
-                             autocommit=True)
-    with connection.cursor() as cursor:
-        if checkTableExists(table, cursor):
-            log.info("Fetching AVD")
-            try:
-                sql = f"SELECT (value) FROM `{table}`"
-                print(sql)
-                cursor.execute(sql)
-                values = [item['value'] for item in cursor.fetchall()]
-                #log.info(f"Fetched: {values}")
-                avd['values'] = values
-            except Exception as e:
-                log.error(f"Fetch AVD Error: {e}")
 
-            try:
-                sql = f"SELECT (timestamp) FROM `{table}`"
-                print(sql)
-                cursor.execute(sql)
-                timestamps = [item['timestamp'] for item in cursor.fetchall()]
-                #log.info(f"Fetched: {timestamps}")
-                avd['timestamps'] = timestamps
-            except Exception as e:
-                log.error(f"Fetch AVD Error: {e}")
+    try:
+        connection = pymysql.connect(host=db_host,
+                                 user=db_user,
+                                 password=db_pass,
+                                 database=database,
+                                 charset='utf8mb4',
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 autocommit=True)
+    except Exception as e:
+        log.error(e)
+    else:
+        with connection.cursor() as cursor:
+            if checkTableExists(table, connection):
+                log.info("Fetching AVD")
+                try:
+                    sql = f"SELECT (value) FROM `{table}`"
+                    print(sql)
+                    cursor.execute(sql)
+                    values = [item['value'] for item in cursor.fetchall()]
+                    #log.info(f"Fetched: {values}")
+                    avd['values'] = values
+                except Exception as e:
+                    log.error(f"Fetch AVD Error: {e}")
 
-        cursor.close()
-        return avd
+                try:
+                    sql = f"SELECT (timestamp) FROM `{table}`"
+                    print(sql)
+                    cursor.execute(sql)
+                    timestamps = [item['timestamp'] for item in cursor.fetchall()]
+                    #log.info(f"Fetched: {timestamps}")
+                    avd['timestamps'] = timestamps
+                except Exception as e:
+                    log.error(f"Fetch AVD Error: {e}")
 
-def fetchAvd():
-    global ticker
-    global database
-    global DB_HOST
-    global DB_PASS
+            cursor.close()
+            return avd
 
-    avd = {}
-    key = "avd"
-    table = f"{ticker}-{key}"
-    connection = pymysql.connect(host=DB_HOST,
-                             user='root',
-                             password=DB_PASS,
-                             database=database,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor,
-                             autocommit=True)
-    with connection.cursor() as cursor:
-        if checkTableExists(table, cursor):
-            log.info("Fetching AVD")
-            try:
-                sql = f"SELECT (value) FROM `{table}`"
-                print(sql)
-                cursor.execute(sql)
-                values = [item['value'] for item in cursor.fetchall()]
-                #log.info(f"Fetched: {values}")
-                avd['values'] = values
-            except Exception as e:
-                log.error(f"Fetch AVD Error: {e}")
-
-            try:
-                sql = f"SELECT (timestamp) FROM `{table}`"
-                print(sql)
-                cursor.execute(sql)
-                timestamps = [item['timestamp'] for item in cursor.fetchall()]
-                #log.info(f"Fetched: {timestamps}")
-                avd['timestamps'] = timestamps
-            except Exception as e:
-                log.error(f"Fetch AVD Error: {e}")
-
-        cursor.close()
-        return avd
-
-def fetchAvn():
-    global ticker
-    global database
-    global DB_HOST
-    global DB_PASS
-
+def fetchAvn(ticker, database, db_host, db_pass, db_user):
     avn = {}
     key = "avn"
     table = f"{ticker}-{key}"
-    connection = pymysql.connect(host=DB_HOST,
-                             user='root',
-                             password=DB_PASS,
-                             database=database,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor,
-                             autocommit=True)
 
-    with connection.cursor() as cursor:
-        if checkTableExists(table, cursor):
-            log.info("Fetching AVN")
-            try:
-                sql = f"SELECT (value) FROM `{table}`"
-                print(sql)
-                cursor.execute(sql)
-                values = [item['value'] for item in cursor.fetchall()]
-                #log.info(f"Fetched: {values}")
-                avn['values'] = values
-            except Exception as e:
-                log.error(f"Fetch AVN Error: {e}")
+    try:
+        connection = pymysql.connect(host=db_host,
+                                 user=db_user,
+                                 password=db_pass,
+                                 database=database,
+                                 charset='utf8mb4',
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 autocommit=True)
+    except Exception as e:
+        log.error(e)
+    else:
+        with connection.cursor() as cursor:
+            if checkTableExists(table, connection):
+                log.info("Fetching AVN")
+                try:
+                    sql = f"SELECT (value) FROM `{table}`"
+                    print(sql)
+                    cursor.execute(sql)
+                    values = [item['value'] for item in cursor.fetchall()]
+                    #log.info(f"Fetched: {values}")
+                    avn['values'] = values
+                except Exception as e:
+                    log.error(f"Fetch AVN Error: {e}")
 
-            try:
-                sql = f"SELECT (timestamp) FROM `{table}`"
-                print(sql)
-                cursor.execute(sql)
-                timestamps = [item['timestamp'] for item in cursor.fetchall()]
-                #log.info(f"Fetched: {timestamps}")
-                avn['timestamps'] = timestamps
-            except Exception as e:
-                log.error(f"Fetch AVN Error: {e}")
-        cursor.close()
+                try:
+                    sql = f"SELECT (timestamp) FROM `{table}`"
+                    print(sql)
+                    cursor.execute(sql)
+                    timestamps = [item['timestamp'] for item in cursor.fetchall()]
+                    #log.info(f"Fetched: {timestamps}")
+                    avn['timestamps'] = timestamps
+                except Exception as e:
+                    log.error(f"Fetch AVN Error: {e}")
+            cursor.close()
 
-        return avn
+            return avn
 
-def fetchTsl():
-    global ticker
-    global database
-    global DB_HOST
-    global DB_PASS
+def fetchTsl(ticker, database, db_host, db_pass, db_user):
 
     tsl = {}
     key = "tsl"
     table = f"{ticker}-{key}"
-    connection = pymysql.connect(host=DB_HOST,
-                             user='root',
-                             password=DB_PASS,
-                             database=database,
-                             charset='utf8mb4',
-                             cursorclass=pymysql.cursors.DictCursor,
-                             autocommit=True)
+    try:
+        connection = pymysql.connect(host=db_host,
+                                 user=db_user,
+                                 password=db_pass,
+                                 database=database,
+                                 charset='utf8mb4',
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 autocommit=True)
+    except Exception as e:
+        log.error(e)
+    else:
+        with connection.cursor() as cursor:
+            if checkTableExists(table, connection):
+                log.info("Fetching TSL")
+                try:
+                    sql = f"SELECT (value) FROM `{table}`"
+                    print(sql)
+                    cursor.execute(sql)
+                except Exception as e:
+                    log.error(f"Fetch TSL Error: {e}")
+                else:
+                    values = [item['value'] for item in cursor.fetchall()]
+                    #log.info(f"Fetched: {values}")
+                    tsl['values'] = values
 
-    with connection.cursor() as cursor:
-        if checkTableExists(table, cursor):
-            log.info("Fetching TSL")
-            try:
-                sql = f"SELECT (value) FROM `{table}`"
-                print(sql)
-                cursor.execute(sql)
-                values = [item['value'] for item in cursor.fetchall()]
-                #log.info(f"Fetched: {values}")
-                tsl['values'] = values
-            except Exception as e:
-                log.error(f"Fetch TSL Error: {e}")
+                try:
+                    sql = f"SELECT (timestamp) FROM `{table}`"
+                    print(sql)
+                    cursor.execute(sql)
+                except Exception as e:
+                    log.error(f"Fetch TSL Error: {e}")
+                else:
+                    timestamps = [item['timestamp'] for item in cursor.fetchall()]
+                    #log.info(f"Fetched: {timestamps}")
+                    tsl['timestamps'] = timestamps
 
-            try:
-                sql = f"SELECT (timestamp) FROM `{table}`"
-                print(sql)
-                cursor.execute(sql)
-                timestamps = [item['timestamp'] for item in cursor.fetchall()]
-                #log.info(f"Fetched: {timestamps}")
-                tsl['timestamps'] = timestamps
-            except Exception as e:
-                log.error(f"Fetch TSL Error: {e}")
-        
-        #print(f"TSL is {tsl}")
-        cursor.close()
-
-        return tsl
+            return tsl
 
 def fetchLastCandles(dbConnection, ticker):
     data = None
-    if ticker is not None and ticker:
+    log.info(f"ticker is of NoneType: {isinstance(ticker, type(None))}")
+    log.info(f"Ticker is {ticker}")
+
+    if ticker is not None:
         try:
             data = pd.read_sql_query(f"SELECT * FROM `{ticker}`", dbConnection);
         except Exception as e:
             log.error(e)
-
         finally:
             dbConnection.close()
 
@@ -549,12 +492,7 @@ def fetchLastCandles(dbConnection, ticker):
         if data is not None:   
             return data
 
-def fetchAlpacaCredentials():
-    global db_host
-    global db_user
-    global db_pass
-    global database
-
+def fetchAlpacaCredentials(database, db_host, db_user, db_pass):
     connection = pymysql.connect(host=db_host,
                          user=db_user,
                          password=db_pass,
@@ -562,27 +500,30 @@ def fetchAlpacaCredentials():
                          charset='utf8mb4',
                          cursorclass=pymysql.cursors.DictCursor,
                          autocommit=True)
-    with connection.cursor() as cursor:
-        # Create / Update Ticker table value
-        if checkTableExists('credentials', cursor):
-            try:
-                sql = f"SELECT alpaca_key, alpaca_secret FROM `credentials`"
-                cursor.execute(sql)
-                res = cursor.fetchone()
-            except Exception as e:
-                log.error(e)
-            else:
-                if 'alpaca_key' in res and if 'alpaca_secret' in res:
-                    return res['alpaca_key'], res['alpaca_secret']
+    log.info(connection.is_connected())
+    if connection.is_connected():
+        with connection.cursor() as cursor:
+            # Create / Update Ticker table value
+            if checkTableExists('credentials', connection):
+                try:
+                    sql = f"SELECT alpaca_key, alpaca_secret FROM `credentials`"
+                    cursor.execute(sql)
+                    res = cursor.fetchone()
+                except Exception as e:
+                    log.error(e)
                 else:
-                    log.error(f"Alpaca Credential Response was malformed! {res}")
+                    alpaca_key = None
+                    alpaca_secret = None
 
-def updateAlpacaCredentials(alpaca_key, alpaca_secret):
-    global db_host
-    global db_user
-    global db_pass
-    global database
+                    if 'alpaca_key' in res:
+                        alpaca_key = res['alpaca-key']
 
+                    if 'alpaca_secret' in res:
+                        alpaca_secret = res['alpaca_secret']
+
+                    return alpaca_key, alpaca_secret
+
+def updateAlpacaCredentials(alpaca_key, alpaca_secret, database, db_host, db_user, db_pass):
     connection = pymysql.connect(host=db_host,
                          user=db_user,
                          password=db_pass,
@@ -590,42 +531,43 @@ def updateAlpacaCredentials(alpaca_key, alpaca_secret):
                          charset='utf8mb4',
                          cursorclass=pymysql.cursors.DictCursor,
                          autocommit=True)
+    log.info(connection.is_connected())
+    if connection.is_connected():
+        with connection.cursor() as cursor:
+            # Create / Update Ticker table value
+            if checkTableExists('credentials', connection):
+                try:
+                    sql = f"UPDATE `credentials` SET alpaca_key = '{alpaca_key}', alpaca_secret = '{alpaca_secret}'"
+                    print(sql)
+                    result = cursor._last_executed
+                    cursor.execute(sql)
+                    res = cursor.fetchone()
+                except Exception as e:
+                    log.error(f"Error updating Credentials: {e}")
+                else:
+                    log.info(f"Updated Credentials table: {result}")
+            else:
+                try:
+                    sql = f"CREATE TABLE IF NOT EXISTS `credentials` (alpaca_key TEXT, alpaca_secret TEXT);"
+                    log.info(log.info)
+                    cursor.execute(sql)
+                    result = cursor._last_executed
+                except Exception as e:
+                    log.error(f"Error creating Credentials Table: {e}")
+                else:
+                    log.info(f"Created Credentials table: {result}")
 
-    with connection.cursor() as cursor:
-        # Create / Update Ticker table value
-        if checkTableExists('credentials', cursor):
-            try:
-                sql = f"UPDATE `credentials` SET alpaca_key = '{alpaca_key}', alpaca_secret = '{alpaca_secret}'"
-                print(sql)
-                result = cursor._last_executed
-                cursor.execute(sql)
-                res = cursor.fetchone()
-            except Exception as e:
-                log.error(f"Error updating Credentials: {e}")
-            else:
-                log.info(f"Updated Credentials table: {result}")
-        else:
-            try:
-                sql = f"CREATE TABLE IF NOT EXISTS `credentials` (alpaca_key TEXT, alpaca_secret TEXT);"
-                log.info(log.info)
-                cursor.execute(sql)
-                result = cursor._last_executed
-            except Exception as e:
-                log.error(f"Error creating Credentials Table: {e}")
-            else:
-                log.info(f"Created Credentials table: {result}")
-
-            try:
-                sql = f"INSERT INTO `credentials` (alpaca_key, alpaca_secret) VALUES ('{alpaca_key}','{alpaca_secret}')"
-                print(sql)
-                cursor.execute(sql)
-                result = cursor._last_executed
-            except Exception as e:
-                log.error(f"Error inserting into Credentials Table: {e}")
-            else:
-               log.info(f"Inserted Credentials table: {result}")
-            
-            cursor.close()
+                try:
+                    sql = f"INSERT INTO `credentials` (alpaca_key, alpaca_secret) VALUES ('{alpaca_key}','{alpaca_secret}')"
+                    print(sql)
+                    cursor.execute(sql)
+                    result = cursor._last_executed
+                except Exception as e:
+                    log.error(f"Error inserting into Credentials Table: {e}")
+                else:
+                   log.info(f"Inserted Credentials table: {result}")
+                
+                cursor.close()
 
 app = dash.Dash(__name__,suppress_callback_exceptions=True)
 
@@ -654,7 +596,7 @@ def serve_layout():
                     {'label': '1 Hour', 'value': '60'},
                     {'label': '1 Day', 'value': 'D'}
                 ],
-                value=''
+                value=None
             ),
             dcc.RadioItems(
                 id="fake-sensitivity",
@@ -663,7 +605,7 @@ def serve_layout():
                     {'label': 'Moderate', 'value': '1'},
                     {'label': 'Liberal', 'value': '2'}
                 ],
-                value=''
+                value=None
             ),
             dcc.RadioItems(
                 id="submit-inverse-toggle",
@@ -671,13 +613,13 @@ def serve_layout():
                     {'label': 'Regular', 'value': 'False'},
                     {'label': 'Inverse', 'value': 'True'},
                 ],
-                value=''
+                value=None
             ),
             html.Button('Submit', id='submit-ticker', n_clicks=0),
             html.Div(id='ticker-output',
-                 children='Enter a value and press submit'),
+                children='Select your parameters'),
 
-        ]),
+        ], style={}, id='input-container'),
         html.Div([
             dcc.Input(
                 id="alpaca-key",
@@ -692,7 +634,7 @@ def serve_layout():
             html.Button('Submit', id='submit-alpaca', n_clicks=0),
             html.Div(id='alpaca-output',
                  children='Enter a your Alpaca API Key and Secret'),
-        ]),   
+        ], style={}, id='alpaca-input'),   
         dcc.Graph(id = 'candles'),
         html.Div(id='metrics', style = {'display': 'flex', 'align-items': 'center', 'justify-content': 'center'}),
         html.Div([
@@ -712,6 +654,7 @@ def serve_layout():
             interval = 2*1000,
             n_intervals = 0
             ),
+        dcc.Store(id='ticker-value')
         ])
 
 app.layout = serve_layout
@@ -721,76 +664,69 @@ app.layout = serve_layout
     [Input('interval-component', 'n_intervals')]
 )
 def update_candles(n):
-    global ticker
     global old_fig
+    global ticker
     global database
     global new_data
-    global DB_HOST
-    global DB_PASS
+    global db_host
+    global db_pass
     global live_price
 
-    fetchTicker()
+    ticker = fetchTicker(ticker, database, db_host, db_pass)
+    log.info(f"ticker is of NoneType: {isinstance(ticker, type(None))}")
+    log.info(f"Ticker is { ticker}")
 
     if ticker is not None:
         try:
-            sqlEngine = create_engine(f'mysql+pymysql://root:{DB_PASS}@{DB_HOST}/{database}', pool_recycle=3600)
+            sqlEngine = create_engine(f'mysql+pymysql://{db_user}:{db_pass}@{db_host}/{database}', pool_recycle=3600)
         except Exception as e:
-            print(f"SQL Engine Error: {e}")
+            log.error(f"SQL Engine Error: {e}")
+        else:
+            fig = go.Figure()
+            live_table = f"{ticker}-live"
 
-        fig = go.Figure()
-        live_table = f"{ticker}-live"
+            connection = pymysql.connect(host=db_host,
+                                     user=db_user,
+                                     password=db_pass,
+                                     database=database,
+                                     charset='utf8mb4',
+                                     cursorclass=pymysql.cursors.DictCursor,
+                                     autocommit=True)
+            with sqlEngine.connect() as dbConnection:
+                new_data = fetchLastCandles(dbConnection, ticker)
 
-        connection = pymysql.connect(host=DB_HOST,
-                                 user='root',
-                                 password=DB_PASS,
-                                 database=database,
-                                 charset='utf8mb4',
-                                 cursorclass=pymysql.cursors.DictCursor,
-                                 autocommit=True)
-        with sqlEngine.connect() as dbConnection:
-            with connection.cursor() as cursor:
-                if checkTableExists(live_table, cursor):
-                    sql = f"SELECT * FROM `{live_table}`"
-                    cursor.execute(sql)
-                    res = cursor.fetchone()
-                    live_price = res['price']
-                    print(live_price)
-            print('woof')
-            new_data = fetchLastCandles(dbConnection, ticker)
+                fetchSignal(connection, ticker)
 
-            fetchSignal()
+                if new_data is not None:
+                    candlesticks = go.Candlestick(x=new_data['t'],
+                                           open=new_data['o'],
+                                           high=new_data['h'],
+                                           low=new_data['l'],
+                                           close=new_data['c'], name='Market Data')
 
-            print(new_data)
-            if new_data is not None:
-                candlesticks = go.Candlestick(x=new_data['t'],
-                                       open=new_data['o'],
-                                       high=new_data['h'],
-                                       low=new_data['l'],
-                                       close=new_data['c'], name='Market Data')
+                    fig.add_trace(candlesticks)
 
-                fig.add_trace(candlesticks)
+                    # Add Titles
+                    fig.update_layout(
+                        title=ticker + ' Live Price Data',
+                        yaxis_title='Price (USD/share)'
+                    )
 
-                # Add Titles
-                fig.update_layout(
-                    title=ticker + ' Live Price Data',
-                    yaxis_title='Price (USD/share)'
-                )
+                    # Axis and control
+                    fig.update_xaxes(
+                        rangeslider_visible=True,
+                        rangeselector={'buttons': list((
+                            dict(count=15, label="15m", step="minute", stepmode="backward"),
+                            dict(count=30, label="30m", step="minute", stepmode="backward"),
+                            dict(count=1, label="1h", step="hour", stepmode="backward"),
+                            dict(count=2, label="2h", step="hour", stepmode="backward"),
+                            dict(step="all")
+                        ))})
+                    old_fig = fig
 
-                # Axis and control
-                fig.update_xaxes(
-                    rangeslider_visible=True,
-                    rangeselector={'buttons': list((
-                        dict(count=15, label="15m", step="minute", stepmode="backward"),
-                        dict(count=30, label="30m", step="minute", stepmode="backward"),
-                        dict(count=1, label="1h", step="hour", stepmode="backward"),
-                        dict(count=2, label="2h", step="hour", stepmode="backward"),
-                        dict(step="all")
-                    ))})
-                old_fig = fig
-
-                return fig
-            else:
-                return old_fig
+                    return fig
+                else:
+                    return old_fig
     else:
         return {}
 
@@ -799,10 +735,15 @@ def update_candles(n):
     [Input('interval-component', 'n_intervals')]
 )
 def update_tsl(n):
+    global database
+    global db_host
+    global db_pass
+    global db_user
     global tsl
+
     fig = go.Figure()
 
-    tsl = fetchTsl()
+    tsl = fetchTsl(ticker, database, db_host, db_pass, db_user)
 
     if tsl is not None and 'timestamps' in tsl and 'values' in tsl:
         tsl = go.Scatter(
@@ -828,7 +769,6 @@ def update_tsl(n):
                 dict(count=1200, label="2h", step="hour", stepmode="backward"),
                 dict(step="all")
         ))})
-        #print(f'TSL Fig is {fig}')
         return fig
     else:
         return {}
@@ -839,18 +779,22 @@ def update_tsl(n):
 )
 
 def update_avn(n):
+    global database
+    global db_host
+    global db_pass
     global last_avn
 
+    avn = None
     fig = go.Figure()
 
-    avn = fetchAvn()
+    avn = fetchAvn(ticker, database, db_host, db_pass, db_user)
 
     fig.update_layout(
         title='AVN - Stores the last non-zero value of AVD.',
         yaxis_title='AVN'
     )
 
-    if "values" in avn:
+    if avn is not None and "values" in avn:
         last_avn = avn["values"][-1]
 
         if avn is not None and 'timestamps' in avn and 'values' in avn:
@@ -884,11 +828,14 @@ def update_avn(n):
     [Input('interval-component', 'n_intervals')]
 )
 def update_avd(n):
+    global database
+    global db_host
+    global db_pass
     global last_avd
-
+    avd = None
     fig = go.Figure()
 
-    avd = fetchAvd()
+    avd = fetchAvd(ticker, database, db_host, db_pass, db_user)
 
     if avd is not None and 'timestamps' in avd and 'values' in avd:
         last_avd = avd["values"][-1]
@@ -934,12 +881,14 @@ def update_metrics(n):
     global signal
     global tsl
     global tsl_value
+    global ticker
 
     if tsl is not None and 'y' in tsl:
         log.info(f"tsl is {tsl['y'][-1]}")
         tsl_value = tsl['y'][-1]
 
     return [
+        html.H1(f'Ticker is {ticker}', style = {'margin':40}),
         html.H1(f'Signal is {signal}', style = {'margin':40}),
         html.H1(f'AVN is {last_avn}', style = {'margin':40}),
         html.H1(f'AVD is {last_avd}', style = {'margin':40}),
@@ -952,6 +901,7 @@ def update_metrics(n):
     ]
 
 @app.callback(
+    Output("input-container", "style"),
     Output("ticker-output", "children"),
     Input('submit-ticker', 'n_clicks'),
     State('new-ticker', 'value'),
@@ -966,54 +916,68 @@ def update_ticker(n_clicks, new_ticker, inverse_toggle_value_input, timeframe, f
     log.info(f"timeframe is {timeframe}")
     log.info(f"fake_sensitivity is {fake_sensitivity}")
 
+    if new_ticker is None:
+        return {'display': 'block'}, f"Ticker is required"
+
+    if inverse_toggle_value_input is None:
+        return {'display': 'block'}, f"Inverse Toggle is required"
+
+    if timeframe is None:
+        return {'display': 'block'}, f"Timeframe is required"
+
+    if fake_sensitivity is None:
+        return {'display': 'block'}, f"Fake Sensitivity is required"
+
     if inverse_toggle_value_input is not None and inverse_toggle_value_input == 'True':
         inverse_toggle_value = True
     else:
         inverse_toggle_value = False
 
-    if new_ticker is not None and new_ticker:
+    if new_ticker is not None and inverse_toggle_value is not None and timeframe is not None and inverse_toggle_value is not None and fake_sensitivity is not None:
         ticker = new_ticker
-        try:
-            updateTicker(ticker,inverse_toggle_value, timeframe, fake_sensitivity)
-            return f"Ticker was {ticker}"
-        except Exception as e:
-            log.error(e)
+        updateTicker(database, db_host, db_pass, db_user, new_ticker, inverse_toggle_value, timeframe, fake_sensitivity)
+        return {'display': 'none'}, ''
     else:
-        return f""
+        return {'display': 'block'}, ''
 
 @app.callback(
     Output("alpaca-output", "children"),
+    Output('alpaca-input', 'style'),
     Input('submit-alpaca', 'n_clicks'),
     State('alpaca-key', 'value'),
     State('alpaca-secret', 'value'),
 )
 def update_alpaca_api(n_clicks, alpaca_key, alpaca_secret):
     global ticker
-    log.info(f"Alpaca API Key is {alpaca_key}")
-    log.info(f"Alpaca API Secret is {alpaca_secret}")
+    global database
+    global db_host
+    global db_pass
 
-    if alpaca_key is None:
-        log.error(f"Alpaca API Key is not set")
-        return f"Alpaca API Key is required!"
+    alpaca_key, alpaca_secret = fetchAlpacaCredentials(database, db_host, db_user, db_pass)
 
-    if alpaca_secret is None:
-        log.error(f"Alpaca API Secret is not set")
-    
-        return f"Alpaca API Secret is required!"
+    if alpaca_key is not None and alpaca_secret is not None:
+        return '', {'display': 'none'}
+    else:
+        log.info(f"Alpaca API Key is {alpaca_key}")
+        log.info(f"Alpaca API Secret is {alpaca_secret}")
 
-    updateAlpacaCredentials(alpaca_key, alpaca_secret)
+        if alpaca_key is None:
+            log.error(f"Alpaca API Key is not set")
+            return f"Alpaca API Key is required", {'display': 'block'}
+
+        if alpaca_secret is None:
+            log.error(f"Alpaca API Secret is not set")
+        
+            return f"Alpaca API Secret is required", {'display': 'block'}
+
+        updateAlpacaCredentials(alpaca_key, alpaca_secret, database, db_host, db_user, db_pass)
 
 if __name__ == '__main__':
     load_dotenv()
 
-    db_pass = os.environ.get("DB_PASS")
+    db_pass = os.environ.get("MYSQL_PASSWORD")
 
     finnhub_api_key = os.environ.get("FINNHUB_API_KEY")
-
-    db_host = os.environ.get("DB_HOST")
-
-    if db_host is None:
-        db_host = "127.0.0.1"
 
     if db_pass is None:
         log.error(f"db_pass is not set!")
