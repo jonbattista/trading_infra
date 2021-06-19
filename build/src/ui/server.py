@@ -94,7 +94,7 @@ def fetchTicker(ticker, database, db_host, db_pass):
                 else:
                     log.info(f"Ticker response was {res}")
 
-                    if 'ticker' in res:
+                    if 'ticker' in res and res['ticker'] is not 'None':
                         ticker_value = res['ticker']
 
                     if ticker_value is None:
@@ -493,15 +493,17 @@ def fetchLastCandles(dbConnection, ticker):
             return data
 
 def fetchAlpacaCredentials(database, db_host, db_user, db_pass):
-    connection = pymysql.connect(host=db_host,
-                         user=db_user,
-                         password=db_pass,
-                         database=database,
-                         charset='utf8mb4',
-                         cursorclass=pymysql.cursors.DictCursor,
-                         autocommit=True)
-    log.info(connection.is_connected())
-    if connection.is_connected():
+    try:
+        connection = pymysql.connect(host=db_host,
+                                 user=db_user,
+                                 password=db_pass,
+                                 database=database,
+                                 charset='utf8mb4',
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 autocommit=True)
+    except Exception as e:
+        log.error(e)
+    else:
         with connection.cursor() as cursor:
             # Create / Update Ticker table value
             if checkTableExists('credentials', connection):
@@ -522,17 +524,22 @@ def fetchAlpacaCredentials(database, db_host, db_user, db_pass):
                         alpaca_secret = res['alpaca_secret']
 
                     return alpaca_key, alpaca_secret
+            else:
+                log.error("Credentials Table does not exist!")
+                return None, None
 
 def updateAlpacaCredentials(alpaca_key, alpaca_secret, database, db_host, db_user, db_pass):
-    connection = pymysql.connect(host=db_host,
-                         user=db_user,
-                         password=db_pass,
-                         database=database,
-                         charset='utf8mb4',
-                         cursorclass=pymysql.cursors.DictCursor,
-                         autocommit=True)
-    log.info(connection.is_connected())
-    if connection.is_connected():
+    try:
+        connection = pymysql.connect(host=db_host,
+                                 user=db_user,
+                                 password=db_pass,
+                                 database=database,
+                                 charset='utf8mb4',
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 autocommit=True)
+    except Exception as e:
+        log.error(e)
+    else:
         with connection.cursor() as cursor:
             # Create / Update Ticker table value
             if checkTableExists('credentials', connection):
@@ -673,6 +680,7 @@ def update_candles(n):
     global live_price
 
     ticker = fetchTicker(ticker, database, db_host, db_pass)
+
     log.info(f"ticker is of NoneType: {isinstance(ticker, type(None))}")
     log.info(f"Ticker is { ticker}")
 
