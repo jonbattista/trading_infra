@@ -60,7 +60,9 @@ tsl_value = None
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
 log.propagate = False
+formatter = logging.Formatter('[%(asctime)s] %(pathname)s:%(lineno)d %(levelname)s - %(message)s','%m-%d %H:%M:%S')
 consoleHandler = logging.StreamHandler(stdout)
+consoleHandler.setFormatter(formatter)
 log.addHandler(consoleHandler)
 
 VALID_USERNAME_PASSWORD_PAIRS = {
@@ -503,16 +505,34 @@ def fetchLastCandles(dbConnection, ticker):
 
     if ticker is not 'None' and ticker is not None:
         try:
-            data = pd.read_sql_query(f"SELECT * FROM `{ticker}`", dbConnection);
+            dataframe = pd.read_sql_query(f"SELECT * FROM `{ticker}`", dbConnection);
         except Exception as e:
             log.error(e)
-        finally:
-            dbConnection.close()
+        else:
 
-        pd.set_option('display.expand_frame_repr', False)
-        #print(f"Fetched Table: {data}")
-        if data is not None:   
-            return data
+            pd.set_option('display.expand_frame_repr', False)
+            #print(f"Fetched Table: {data}")
+            if dataframe is not None:   
+                return dataframe
+
+def fetchLastPrice(connection, table):
+    if table is not 'None' and table is not None:
+        with connection.cursor() as cursor:
+            if checkTableExists(table, connection) and checkTableIsNotEmpty(table, connection):
+                log.info("Fetching Last Price")
+                try:
+                    sql = f"SELECT (price) FROM `{table}`"
+                    log.info(sql)
+                    cursor.execute(sql)
+                    result = cursor.fetchone()
+                except Exception as e:
+                    log.error(f"Error fetching Last Price: {e}")
+                else:
+                    if result is not None and 'price' in result:
+                        return result['price']
+            else:
+                log.error(f"Table {table} doesnt exist or is empty!")
+                return None
 
 def fetchAlpacaCredentials(database, db_host, db_user, db_pass):
     try:
@@ -731,17 +751,21 @@ def update_candles(n):
                                      charset='utf8mb4',
                                      cursorclass=pymysql.cursors.DictCursor,
                                      autocommit=True)
+
+            live_price = fetchLastPrice(connection, live_table)
+
             with sqlEngine.connect() as dbConnection:
-                new_data = fetchLastCandles(dbConnection, ticker)
+                log.info('bark')
+                dataframe = fetchLastCandles(dbConnection, ticker)
 
                 fetchSignal(connection, ticker)
-
-                if new_data is not None:
-                    candlesticks = go.Candlestick(x=new_data['t'],
-                                           open=new_data['o'],
-                                           high=new_data['h'],
-                                           low=new_data['l'],
-                                           close=new_data['c'], name='Market Data')
+                log.info(dataframe)
+                if dataframe is not None:
+                    candlesticks = go.Candlestick(x=dataframe['t'],
+                                           open=dataframe['o'],
+                                           high=dataframe['h'],
+                                           low=dataframe['l'],
+                                           close=dataframe['c'], name='Market Data')
 
                     fig.add_trace(candlesticks)
 
@@ -762,11 +786,13 @@ def update_candles(n):
                             dict(step="all")
                         ))})
                     old_fig = fig
-
+                    print('meow')
                     return fig
                 else:
+                    print('woof')
                     return old_fig
     else:
+        print('foo')
         return {}
 
 @app.callback(
@@ -875,8 +901,6 @@ def update_avd(n):
     fig = go.Figure()
 
     avd = fetchAvd(ticker, database, db_host, db_pass, db_user)
-
-    log.info(f"AVD is {avd}")
 
     if avd is not None and 'timestamps' in avd and 'values' in avd and len(avd['timestamps']) > 0 and len(avd['values']) > 0:
         last_avd = avd["values"][-1]
@@ -1004,12 +1028,12 @@ def update_alpaca_api(n_clicks, alpaca_key, alpaca_secret):
 
         if alpaca_key is None:
             log.error(f"Alpaca API Key is not set")
-            return f"Alpaca API Key is required", {'display': 'block'}
+            return f"Alpaca API Key is required to trade", {'display': 'block'}
 
         if alpaca_secret is None:
             log.error(f"Alpaca API Secret is not set")
         
-            return f"Alpaca API Secret is required", {'display': 'block'}
+            return f"Alpaca API Secret is required to trade", {'display': 'block'}
 
         updateAlpacaCredentials(alpaca_key, alpaca_secret, database, db_host, db_user, db_pass)
 
