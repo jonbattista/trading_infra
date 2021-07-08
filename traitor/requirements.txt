@@ -6,4 +6,3 @@ discord.py
 pymongo
 apscheduler
 python-dotenv
-twelvedata

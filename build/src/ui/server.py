@@ -103,23 +103,23 @@ def fetchTicker(ticker, database, db_host, db_pass):
                         else:
                             if 'ticker' in res and res['ticker'] is not None and res['ticker'] is not 'None':
                                 ticker_value = res['ticker']
-                                if first_run:
-                                    log.info(f'Dropping Table {ticker_value} on first run!')
-                                    dropTables(connection, ticker_value)
-                                    first_run = False
+#                                if first_run:
+#                                    log.info(f'Dropping Table {ticker_value} on first run!')
+#                                    dropTables(connection, ticker_value)
+#                                    first_run = False
+#                                else:
+                                if ticker_value is None:
+                                    log.error(f"Ticker Value is None")
                                 else:
-                                    if ticker_value is None:
-                                        log.error(f"Ticker Value is None")
+                                    if ticker is None and ticker_value:
+                                        ticker = ticker_value
+                                        log.info(f"Set Ticker to {ticker}")
+                                    
+                                    if old_ticker != ticker_value:
+                                        ticker = ticker_value
+                                        log.info(f"Updated Ticker from {old_ticker} to {ticker}")
                                     else:
-                                        if ticker is None and ticker_value:
-                                            ticker = ticker_value
-                                            log.info(f"Set Ticker to {ticker}")
-                                        
-                                        if old_ticker != ticker_value:
-                                            ticker = ticker_value
-                                            log.info(f"Updated Ticker from {old_ticker} to {ticker}")
-                                        else:
-                                            log.info(f"Old Ticker: {old_ticker} and New Ticker: {ticker} are the same!")
+                                        log.info(f"Old Ticker: {old_ticker} and New Ticker: {ticker} are the same!")
                     return ticker
                 else:
                     log.info('Ticker table is empty!')
@@ -242,19 +242,22 @@ def updateTicker( database, db_host, db_pass, db_user, new_ticker, inverse_toggl
             "t": "DATETIME",
             "v": "DOUBLE",
         }
-        tables[f"{new_ticker}-live"] = { 
+        tables[f"{new_ticker}-live"] = {
             "index": "INT",
             "price": "FLOAT"
         }
         tables[f"{new_ticker}-avn"] = {
+            "index": "BIGINT PRIMARY KEY",
             "value": "DOUBLE",
             "timestamp": "DATETIME"
         }
         tables[f"{new_ticker}-avd"] = {
+            "index": "BIGINT PRIMARY KEY",
             "value": "DOUBLE",
             "timestamp": "DATETIME"
         }
         tables[f"{new_ticker}-tsl"] = {
+            "index": "BIGINT PRIMARY KEY",
             "value": "DOUBLE",
             "timestamp": "DATETIME"
         }
@@ -954,11 +957,13 @@ def update_metrics(n):
 
     return [
         html.H1(f'Ticker is {ticker}', style = {'margin':40}),
-        html.H1(f'Signal is {signal}', style = {'margin':40}),
+        html.H1(f'Signal is a {signal}', style = {'margin':40}),
         html.H1(f'AVN is {last_avn}', style = {'margin':40}),
         html.H1(f'AVD is {last_avd}', style = {'margin':40}),
         html.H1(f'Last Price is ${live_price}', style = {'margin':40}),
         html.H1(f'TSL is ${tsl_value}', style = {'margin':40}),
+#        html.H1(f'Buy Signal Count is ${buy_signal_count}', style = {'margin':40}),
+#        html.H1(f'Sell Signal Count is ${sell_signal_count}', style = {'margin':40}),
 #        html.H1(f'Support 0 is {sup0}', style = {'margin':40}),
 #        html.H1(f'Support 1 is {sup1}', style = {'margin':40}),
 #        html.H1(f'Resistance 0 is {res0}', style = {'margin':40}),
