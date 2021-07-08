@@ -966,9 +966,11 @@ def checkBuySignal(ticker, cursor, live, use_inverse_trade, fake_count):
 
     elif buy_signal_flag == False:
         sell_signal_flag = False
-        sendDiscordMessage(f'Buy signal Count is now: {buy_signal_count}')
         buy_signal_count = buy_signal_count + 1
         buy_signal_flag = False
+
+    if buy_signal_count > 0:
+        sendDiscordMessage(f'Buy signal Count is now: {buy_signal_count}')
         
 def checkSellSignal(ticker, cursor, live, use_inverse_trade, fake_count):
     global sell_signal_flag
@@ -992,12 +994,15 @@ def checkSellSignal(ticker, cursor, live, use_inverse_trade, fake_count):
 
         executeTrade(data, live, 'sell', use_inverse_trade)
 
-    elif sell_signal_flag == False :
+    elif sell_signal_flag == False:
         buy_signal_flag = False
-        sendDiscordMessage(f'Sell signal Count is now: {sell_signal_count}')
         log.info(buy_signal_count)
         log.info(sell_signal_flag)
         sell_signal_count = sell_signal_count + 1
+
+    if sell_signal_count > 0:
+        sendDiscordMessage(f'Sell signal Count is now: {sell_signal_count}')
+
 def updateSignalTable(signal, signal_table, cursor):
     if checkTableExists(signal_table, cursor):
         if checkTableIsNotEmpty(signal_table,cursor):
@@ -1061,6 +1066,8 @@ def calculateSignal():
     global db_user
     global db_host
     global db_pass
+    global buy_signal_count
+    global sell_signal_count
 
     ticker, timeframe, fake_count, use_inverse_trade, old_ticker = fetchTicker(None, database, db_user, db_pass, db_host)
 
@@ -1146,7 +1153,7 @@ def calculateSignal():
                                     if avd != previous_avd:
                                         #sendDiscordMessage(f'AVD changed from {previous_avd} to {avd}!')
                                         previous_avd = avd
-                                    print(f'AVD is {avd}')
+                                    log.info(f'AVD is {avd}')
                                     if avd is not None:
                                         updateAvd(ticker, database, db_user, db_pass, db_host, avd, now_est)
 
@@ -1154,7 +1161,7 @@ def calculateSignal():
                                     if avd != 0:
                                         avn = avd
                                         updateAvn(ticker, database, db_user, db_pass, db_host, avn, now_est)
-                                    print(f'AVN is {avn}')
+                                    log.info(f'AVN is {avn}')
 
                                     # TSL line
                                     if avn == 1:
@@ -1186,7 +1193,7 @@ def calculateSignal():
                                         log.info('Buy Signal detected!')
                                         checkBuySignal(ticker, cursor, live, use_inverse_trade, fake_count)
 
-                                    if sell_signal_count > 0 and live <= tsl and live <= close and avn is not None:
+                                    if sell_signal_count > 0 and live >= tsl and live >= close and avn is not None:
                                         log.info('Fake Detected! Sell Signal went away! Clearing all Flags...')
                                         buy_signal_count = 0
                                         sell_signal_count = 0
@@ -1220,6 +1227,32 @@ def fetchLastCandles(ticker, dbConnection):
         dbConnection.close()
 
     return data
+
+def dropAllTables(database, db_user, db_pass, db_host):
+    try:
+        connection = pymysql.connect(host=db_host,
+                                 user=db_user,
+                                 password=db_pass,
+                                 database=database,
+                                 charset='utf8mb4',
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 autocommit=True)
+    except Exception as e:
+        log.error(e)
+    else:
+        with connection.cursor() as cursor:
+            cursor.execute('SHOW TABLES;')
+            tables = cursor.fetchall()
+            log.info(tables)
+            if tables is not None:
+                log.info(len(tables))
+                cursor.execute('SET FOREIGN_KEY_CHECKS = 0;')
+                for table in tables:
+                    sql = f"DROP TABLE IF EXISTS {table['Tables_in_trades']};"
+                    log.info(part)
+                    log.info(sql)
+                    cursor.execute(sql)
+                cursor.execute('SET FOREIGN_KEY_CHECKS = 1;')
 
 def dropTickerTable(database, db_user, db_pass, db_host):
     try:
@@ -1694,8 +1727,8 @@ def main():
     log.info("Starting Ticker check loop!")
 
     ticker, timeframe, fake_count, use_inverse_trade, old_ticker = fetchTicker(None, database, db_user, db_pass, db_host)
-
-    dropTables(ticker, database, db_user, db_pass, db_host)
+    dropAllTables(database, db_user, db_pass, db_host)
+    #dropTables(ticker, database, db_user, db_pass, db_host)
 
     dropTickerTable(database, db_user, db_pass, db_host)
 
