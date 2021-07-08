@@ -213,10 +213,26 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
                     order_id = order.id
                     order_status = order.status
                     log.info(f'Buy Order status is {order_status}')
-
                     if order_status == 'filled' or order_status == 'partially_filled' or order_status == 'canceled' or order_status == 'done_for_day' or order_status == 'replaced' or order_status == 'pending_replace':
                         log.info(f'Order Status is {order_status}. Breaking!')
                         break
+#                    log.info(f'Modified Buy Order ID: {order_id}')
+#                except tradeapi.rest.APIError as err:
+#                    log.error(f'Error modifying buy order: {err.response.content}')
+#                    raise#
+
+#                log.info(f'Buy Limit Price was changed from {limit_price} to {new_limit_price}')
+#                limit_price = new_limit_price
+#                log.info(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
+#                stop = new_stop
+#                log.info(f'Buy Order status is: {order_status}')#
+
+#            elif side == 'sell':
+#                new_limit_price = round(float(order.limit_price) * new_sell_stop_limit_price_multiplier, 2)
+#                order = api.get_order(order_id)
+#                order_id = order.id
+#                order_status = order.status
+#                log.info(f'Sell Order status is {order_status}')
 
                     try:
                         order = api.replace_order(
@@ -245,6 +261,17 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
                     order_id = order.id
                     order_status = order.status
                     log.info(f'Sell Order status is {order_status}')
+
+#                    log.info(f'Modified Sell Order ID: {order_id}')
+#                except tradeapi.rest.APIError as err:
+#                    log.error(f'Error modifying sell order: {err.response.content}')
+#                    raise
+
+#                log.info(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
+#                limit_price = new_limit_price
+#                log.info(f'Sell Order status is: {order_status}')
+#            else:
+#                log.info(f'Order is None!')
 
                     if order_status == 'filled' or order_status == 'partially_filled' or order_status == 'canceled' or order_status == 'done_for_day' or order_status == 'replaced' or order_status == 'pending_replace':
                         log.info(f'Order Status is {order_status}. Breaking!')
