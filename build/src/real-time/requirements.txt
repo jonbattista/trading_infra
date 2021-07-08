@@ -1,0 +1,8 @@
+apscheduler
+sqlalchemy
+pandas
+datetime
+pymysql
+websocket-client
+python-dotenv
+pytz

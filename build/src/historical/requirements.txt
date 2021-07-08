@@ -1,0 +1,8 @@
+websocket
+sqlalchemy
+pymysql
+pandas
+requests
+apscheduler
+python-dotenv
+pytz

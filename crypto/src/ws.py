@@ -6,7 +6,7 @@ import json
 
 td = TDClient(apikey="6ada7883b5494ec2ab023bbbf350a589")
 ts = td.time_series(
-    symbol="TQQQ",
+    symbol="BTC/USD",
     outputsize=8,
     interval="1h",
 )

@@ -22,20 +22,17 @@ from datetime import date
 from discord import Webhook, RequestsWebhookAdapter
 import inspect
 import pytz
-from twelvedata import TDClient
 from dotenv import load_dotenv
 
 load_dotenv()
 
-API_KEY = os.environ.get('TWELVEDATA_API_KEY')
-
 # Configure Logging for Docker container
-log = logging.getLogger('traitor')
+log = logging.getLogger()
 log.setLevel(logging.DEBUG)
 log.propagate = False
-#logFormatter = logging.Formatter("%(name)-12s %(asctime)s %(levelname)-8s %(filename)s:%(funcName)s %(message)s")
+formatter = logging.Formatter('[%(asctime)s] %(pathname)s:%(lineno)d %(levelname)s - %(message)s','%m-%d %H:%M:%S')
 consoleHandler = logging.StreamHandler(stdout)
-#consoleHandler.setFormatter(logFormatter)
+consoleHandler.setFormatter(formatter)
 log.addHandler(consoleHandler)
 
 def marketIsOpen():
@@ -49,10 +46,10 @@ def marketIsOpen():
         market_closed = now.replace(hour=16, minute=0, second=0, microsecond=0)
 
     if now < market_open or now > market_closed:
-        #log.info(f"Market is Closed - {time.strftime('%l:%M %p')}")
+        log.info(f"Market is Closed - {time.strftime('%l:%M %p')}")
         return False
     else:
-        #log.info(f"Market is Open - {time.strftime('%l:%M %p')}")
+        log.info(f"Market is Open - {time.strftime('%l:%M %p')}")
         return True
     return True
 
@@ -78,89 +75,98 @@ def sendDiscordMessage(message):
         webhook.send(message)
 
 def checkOpenOrders(api, user, qty, side, ticker, position, inverse_mode):
-    open_orders = api.list_orders()
-    
-    if not open_orders:
-        log.info('No Open Orders found.')
+    try:
+        open_orders = api.list_orders()
+    except Exception as e:
+        log.error(e)
     else:
-        log.info(f'{len(open_orders)} Open Orders were found.')
+        if not open_orders:
+            log.info('No Open Orders found.')
+            return None
+        else:
+            log.info(f'{len(open_orders)} Open Orders were found.')
+                
+            open_order_qty = 0
+            open_order_ticker_count = 0
+            for open_order in open_orders:
+                if  open_order.symbol == ticker:
+                    open_order_qty += int(open_order.qty)
+                    open_order_ticker_count += 1
+
+            log.info(f'There are {open_order_ticker_count} Open Orders for {ticker}')
+
+            for open_order in open_orders:
+                if open_order.symbol == ticker:
+                    log.info(f'Canceling {open_order.order_type} Order ID: {open_order.id}')
+                    cancelled_order = api.cancel_order(order_id=open_order.id)
+                    time.sleep(3)
+                    log.info(cancelled_order)
+
+            open_order_qty = 0
+            open_order_ticker_count = 0
+
+            for open_order in open_orders:
+                if  open_order.symbol == ticker:
+                    open_order_qty += int(open_order.qty)
+                    open_order_ticker_count += 1
+
+            log.info(f'Open Order Quantity is {open_order_qty}')
+
+            if position is not None and int(position.qty) == open_order_qty and side == 'sell':
+                log.error(f'Failed: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
+                sendDiscordMessage(f'Failed: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
+                return f'Failed: There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.', 400
             
-    open_order_qty = 0
-    open_order_ticker_count = 0
-    for open_order in open_orders:
-        if  open_order.symbol == ticker:
-            open_order_qty += int(open_order.qty)
-            open_order_ticker_count += 1
+            elif position is not None and int(position.qty) <= qty:
+                if int(open_order_qty) - qty == 0 and side == 'sell':
+                    log.error(f'Failed: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}')
+                    sendDiscordMessage(f'Failed: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}')
+                    raise Exception (f'Failed: There is already an Open order to sell {open_order_qty} of {ticker}')
 
-    log.info(f'There are {open_order_ticker_count} Open Orders for {ticker}')
-
-    for open_order in open_orders:
-        if open_order.symbol == ticker:
-            log.info(f'Canceling {open_order.order_type} Order ID: {open_order.id}')
-            cancelled_order = api.cancel_order(order_id=open_order.id)
-            time.sleep(3)
-            log.info(cancelled_order)
-
-    open_order_qty = 0
-    open_order_ticker_count = 0
-    open_orders = api.list_orders()
-    for open_order in open_orders:
-        if  open_order.symbol == ticker:
-            open_order_qty += int(open_order.qty)
-            open_order_ticker_count += 1
-
-    log.info(f'Open Order Quantity is {open_order_qty}')
-    if position is not None and int(position.qty) == open_order_qty and side == 'sell':
-        log.error(f'Failed: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
-        sendDiscordMessage(f'Failed: User: {user} - There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.')
-        return f'Failed: There are already {open_order_ticker_count} Open Orders totaling {open_order_qty} shares of {ticker}. You have nothing to sell.', 400
-    elif position is not None and int(position.qty) <= qty:
-        if int(open_order_qty) - qty == 0 and side == 'sell':
-            log.error(f'Failed: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}')
-            sendDiscordMessage(f'Failed: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}')
-            raise Exception (f'Failed: meow There is already an Open order to sell {open_order_qty} of {ticker}')
-
-        elif int(open_order_qty) - qty > 0 and side == 'sell':
-            log.warning(f'Warning: User: {user} - You are selling {open_order_qty} of {ticker}, which would leave {int(open_order_qty) - qty} leftover.')
-    elif position is not None and int(position.qty) > qty:
-        if int(open_order_qty) - qty == 0 and side == 'sell':
-            if inverse_mode:
-                log.info(f'No Open Orders found for {ticker}. Using Position Quantity')
-            else:
-                log.error(f'Failed: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}.')
-                sendDiscordMessage(f'Failed: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}.')
-                raise Exception (f'Failed: There is already an Open order to sell {open_order_qty} of {ticker}')
-        elif int(open_order_qty) - qty > 0 and side == 'sell':
-            log.warning(f'Warning: User: {user} - You are selling {open_order_qty} of {ticker}, which would leave {abs(int(open_order_qty) - qty)} leftover.')
-
-    return None
+                elif int(open_order_qty) - qty > 0 and side == 'sell':
+                    log.warning(f'Warning: User: {user} - You are selling {open_order_qty} of {ticker}, which would leave {int(open_order_qty) - qty} leftover.')
+            
+            elif position is not None and int(position.qty) > qty:
+                if int(open_order_qty) - qty == 0 and side == 'sell':
+                    if inverse_mode:
+                        log.info(f'No Open Orders found for {ticker}. Using Position Quantity')
+                    else:
+                        log.error(f'Failed: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}.')
+                        sendDiscordMessage(f'Failed: User: {user} - There is already an Open order to sell {open_order_qty} of {ticker}.')
+                        raise Exception (f'Failed: There is already an Open order to sell {open_order_qty} of {ticker}')
+                
+                elif int(open_order_qty) - qty > 0 and side == 'sell':
+                    log.warning(f'Warning: User: {user} - You are selling {open_order_qty} of {ticker}, which would leave {abs(int(open_order_qty) - qty)} leftover.')
 
 def checkPositionExists(api, user, side, ticker, inverse_trade):
-    portfolio = api.list_positions()
-
-    if not portfolio:
-        log.info('No Positions were found.')
+    try:
+        portfolio = api.list_positions()
+    except Exception as e:
+        log.error(e)
     else:
-        log.info(f'{len(portfolio)} Positions were found.')
-
-        position = next((position for position in portfolio if position.symbol == ticker), None)
-
-        if position is not None and side == 'buy':
-            log.info(f'User: {user} - You have a Position of {position.qty} shares in {ticker}')
-            return position
-        elif position is None and side == 'buy':
-            log.info(f'No position for {ticker} found. Proceeding...')
-        elif position is None and side == 'sell':
-            if not inverse_trade:
-                log.info(f'Failed: User {user} - You have no position in {ticker} to sell.')
-                return None
-            elif inverse_trade:
-                log.info(f'User {user} - Has no position in {ticker} to sell. Will buy Inverse Ticker.')
-        elif position is not None and side == 'sell':
-            log.info(f'User {user} - Has {position.qty} shares of {ticker} to sell')
-            return position
+        if not portfolio:
+            log.info('No Positions were found.')
         else:
-            return None
+            log.info(f'{len(portfolio)} Positions were found.')
+
+            position = next((position for position in portfolio if position.symbol == ticker), None)
+
+            if position is not None and side == 'buy':
+                log.info(f'User: {user} - You have a Position of {position.qty} shares in {ticker}')
+                return position
+            elif position is None and side == 'buy':
+                log.info(f'No position for {ticker} found. Proceeding...')
+            elif position is None and side == 'sell':
+                if not inverse_trade:
+                    log.info(f'Failed: User {user} - You have no position in {ticker} to sell.')
+                    return None
+                elif inverse_trade:
+                    log.info(f'User {user} - Has no position in {ticker} to sell. Will buy Inverse Ticker.')
+            elif position is not None and side == 'sell':
+                log.info(f'User {user} - Has {position.qty} shares of {ticker} to sell')
+                return position
+            else:
+                return None
 
 def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, time_in_force, limit_price, order_id, stop):
     new_buy_limit_price_mulitplier = 1.005
@@ -174,113 +180,143 @@ def watchOrderFilledStatus(api, user, user_key, ticker, qty, side, order_type, t
     new_sell_stop_limit_price_multiplier = .9925
 
     log.info(f'Checking Status for Original Order ID: {order_id}')
-    order = api.get_order(order_id)
-
-    if order is not None:
-        retry = 0
-        order_id = order.id
-        order_status = order.status
-        log.info(f'Initial Order status is {order_status}')
-
-        if not marketIsOpen():
-            raise Exception(f"Failed: Order to {side} {qty} shares of {ticker} was submitted but cannot be filled - Market is Closed")
-        else:
-            marketOpen = marketIsOpen()
-
-        while order_status == 'accepted' or order_status == 'new' and order_status != 'partially_filled' and order_status != 'filled' and order_status != 'canceled' and order_status != 'done_for_day' and order_status != 'replaced' and order_status != 'pending_replace' and retry < 5 and marketOpen:
-            time.sleep(15)
-            log.info(f'Order Retry is {retry}/5')
-
-            if side == 'buy':
-                new_limit_price = round(float(order.limit_price) * new_buy_limit_price_mulitplier, 2)
-                if order is not None and order.legs is not None: 
-                    stop_limit_price = round(float(order.legs[0].stop_price) * new_buy_stop_limit_price_multiplier, 2)
-                    new_stop = round(float(order.legs[0].stop_price) * new_buy_stop_price_multiplier, 2)
-                else:
-                    stop_limit_price = round(float(stop) * new_buy_stop_limit_price_multiplier, 2)
-                    new_stop = round(float(stop) * new_buy_stop_price_multiplier, 2)
-
-                order = api.get_order(order_id)
-                order_id = order.id
-                order_status = order.status
-                log.info(f'Buy Order status is {order_status}')
-
-                if order_status == 'filled' or order_status == 'partially_filled' or order_status == 'canceled' or order_status == 'done_for_day' or order_status == 'replaced' or order_status == 'pending_replace':
-                    log.info(f'Order Status is {order_status}. Breaking!')
-                    break
-
-                try:
-                    order = api.replace_order(
-                        order_id=order.id,
-                        qty=qty,
-                        time_in_force=time_in_force,
-                        limit_price=new_limit_price
-                    )
-                    order_id = order.id
-                    order_status = order.status
-
-                    log.info(f'Modified Buy Order ID: {order_id}')
-                except tradeapi.rest.APIError as err:
-                    log.error(f'Error modifying buy order: {err.response.content}')
-                    raise
-
-                log.info(f'Buy Limit Price was changed from {limit_price} to {new_limit_price}')
-                limit_price = new_limit_price
-                log.info(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
-                stop = new_stop
-                log.info(f'Buy Order status is: {order_status}')
-
-            elif side == 'sell':
-                new_limit_price = round(float(order.limit_price) * new_sell_stop_limit_price_multiplier, 2)
-                order = api.get_order(order_id)
-                order_id = order.id
-                order_status = order.status
-                log.info(f'Sell Order status is {order_status}')
-
-                if order_status == 'filled' or order_status == 'partially_filled' or order_status == 'canceled' or order_status == 'done_for_day' or order_status == 'replaced' or order_status == 'pending_replace':
-                    log.info(f'Order Status is {order_status}. Breaking!')
-                    sendDiscordMessage
-                    break
-
-                try:
-                    order = api.replace_order(
-                        order_id=order.id,
-                        qty=qty,
-                        time_in_force=time_in_force,
-                        limit_price=new_limit_price
-                    )
-                    order_id = order.id
-                    order_status = order.status
-                    log.info(f'Modified Sell Order ID: {order_id}')
-                except tradeapi.rest.APIError as err:
-                    log.error(f'Error modifying sell order: {err.response.content}')
-                    raise
-
-                log.info(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
-                limit_price = new_limit_price
-                log.info(f'Sell Order status is: {order_status}')
-            else:
-                log.info(f'Order is None!')
-
-            marketOpen = marketIsOpen()
-            time.sleep(10)
-            retry += 1
-    
+    try:
         order = api.get_order(order_id)
-        order_id = order.id
-        order_status = order.status
-        log.info(f'Last Order ID: {order_id}')
-        log.info(f'Last Order status is: {order_status}')
-
-    if retry >= 5:
-        return f'Failed: Retry limit reached to {side} {qty} of {ticker}. Aborting.'
-    elif retry < 5 and order_status == 'filled' or order_status == 'partially_filled':
-        return f'{order_status}'
-    elif retry < 5 and order_status == 'canceled' or order_status == 'done_for_day' or order_status == 'replaced' or order_status == 'pending_replace':
-        return f'Failed: {order_status}'
+    except Exception as e:
+        log.error(e)
     else:
-        log.info('Order was empty!')
-        return None
+        if order is not None:
+            retry = 0
+            order_id = order.id
+            order_status = order.status
+            log.info(f'Initial Order status is {order_status}')
+
+            if not marketIsOpen():
+                raise Exception(f"Failed: Order to {side} {qty} shares of {ticker} was submitted but cannot be filled - Market is Closed")
+            else:
+                marketOpen = marketIsOpen()
+
+            while order_status == 'accepted' or order_status == 'new' and order_status != 'partially_filled' and order_status != 'filled' and order_status != 'canceled' and order_status != 'done_for_day' and order_status != 'replaced' and order_status != 'pending_replace' and retry < 5 and marketOpen:
+                time.sleep(15)
+                log.info(f'Order Retry is {retry}/5')
+
+                if side == 'buy':
+                    new_limit_price = round(float(order.limit_price) * new_buy_limit_price_mulitplier, 2)
+                    if order is not None and order.legs is not None: 
+                        stop_limit_price = round(float(order.legs[0].stop_price) * new_buy_stop_limit_price_multiplier, 2)
+                        new_stop = round(float(order.legs[0].stop_price) * new_buy_stop_price_multiplier, 2)
+                    else:
+                        stop_limit_price = round(float(stop) * new_buy_stop_limit_price_multiplier, 2)
+                        new_stop = round(float(stop) * new_buy_stop_price_multiplier, 2)
+
+                    order = api.get_order(order_id)
+                    order_id = order.id
+                    order_status = order.status
+                    log.info(f'Buy Order status is {order_status}')
+                    if order_status == 'filled' or order_status == 'partially_filled' or order_status == 'canceled' or order_status == 'done_for_day' or order_status == 'replaced' or order_status == 'pending_replace':
+                        log.info(f'Order Status is {order_status}. Breaking!')
+                        break
+#                    log.info(f'Modified Buy Order ID: {order_id}')
+#                except tradeapi.rest.APIError as err:
+#                    log.error(f'Error modifying buy order: {err.response.content}')
+#                    raise#
+
+#                log.info(f'Buy Limit Price was changed from {limit_price} to {new_limit_price}')
+#                limit_price = new_limit_price
+#                log.info(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
+#                stop = new_stop
+#                log.info(f'Buy Order status is: {order_status}')#
+
+#            elif side == 'sell':
+#                new_limit_price = round(float(order.limit_price) * new_sell_stop_limit_price_multiplier, 2)
+#                order = api.get_order(order_id)
+#                order_id = order.id
+#                order_status = order.status
+#                log.info(f'Sell Order status is {order_status}')
+
+                    try:
+                        order = api.replace_order(
+                            order_id=order.id,
+                            qty=qty,
+                            time_in_force=time_in_force,
+                            limit_price=new_limit_price
+                        )
+                        order_id = order.id
+                        order_status = order.status
+
+                        log.info(f'Modified Buy Order ID: {order_id}')
+                    except tradeapi.rest.APIError as err:
+                        log.error(f'Error modifying buy order: {err.response.content}')
+                        raise
+                    else:
+                        log.info(f'Buy Limit Price was changed from {limit_price} to {new_limit_price}')
+                        limit_price = new_limit_price
+                        log.info(f'Buy Stop Loss Price was changed from {stop} to {new_stop}')
+                        stop = new_stop
+                        log.info(f'Buy Order status is: {order_status}')
+
+                elif side == 'sell':
+                    new_limit_price = round(float(order.limit_price) * new_sell_stop_limit_price_multiplier, 2)
+                    order = api.get_order(order_id)
+                    order_id = order.id
+                    order_status = order.status
+                    log.info(f'Sell Order status is {order_status}')
+
+#                    log.info(f'Modified Sell Order ID: {order_id}')
+#                except tradeapi.rest.APIError as err:
+#                    log.error(f'Error modifying sell order: {err.response.content}')
+#                    raise
+
+#                log.info(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
+#                limit_price = new_limit_price
+#                log.info(f'Sell Order status is: {order_status}')
+#            else:
+#                log.info(f'Order is None!')
+
+                    if order_status == 'filled' or order_status == 'partially_filled' or order_status == 'canceled' or order_status == 'done_for_day' or order_status == 'replaced' or order_status == 'pending_replace':
+                        log.info(f'Order Status is {order_status}. Breaking!')
+                        sendDiscordMessage
+                        break
+
+                    try:
+                        order = api.replace_order(
+                            order_id=order.id,
+                            qty=qty,
+                            time_in_force=time_in_force,
+                            limit_price=new_limit_price
+                        )
+                        order_id = order.id
+                        order_status = order.status
+                        log.info(f'Modified Sell Order ID: {order_id}')
+                    except tradeapi.rest.APIError as err:
+                        log.error(f'Error modifying sell order: {err.response.content}')
+                        raise
+
+                    log.info(f'Sell Limit Price was changed from {limit_price} to {new_limit_price}')
+                    limit_price = new_limit_price
+                    log.info(f'Sell Order status is: {order_status}')
+                else:
+                    log.info(f'Order is None!')
+
+                marketOpen = marketIsOpen()
+                time.sleep(10)
+                retry += 1
+        
+            order = api.get_order(order_id)
+            order_id = order.id
+            order_status = order.status
+            log.info(f'Last Order ID: {order_id}')
+            log.info(f'Last Order status is: {order_status}')
+
+            if retry >= 5:
+                return f'Failed: Retry limit reached to {side} {qty} of {ticker}. Aborting.'
+            elif retry < 5 and order_status == 'filled' or order_status == 'partially_filled':
+                return f'{order_status}'
+            elif retry < 5 and order_status == 'canceled' or order_status == 'done_for_day' or order_status == 'replaced' or order_status == 'pending_replace':
+                return f'Failed: {order_status}'
+        else:
+            log.warning('Order was empty!')
+            return None
 
 def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, stop_limit_price, stop):    
     if stop is None and stop_limit_price is None and side == 'sell':
@@ -300,7 +336,8 @@ def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, 
             else:
                 log.error(f'Error submitting Order: {e}')
                 raise
-        return order
+        else:
+            return order
     else:
         try:
             order = api.submit_order(
@@ -323,7 +360,8 @@ def submitOrder(api, ticker, qty, side, order_type, time_in_force, limit_price, 
             else:
                 log.error(f'Error submitting Order: {e}')
                 raise
-        return order
+        else:
+            return order
     return None
 
 def orderFlow(api, user, user_key, ticker, position, buying_power, qty, side, order_type, time_in_force, limit_price, stop_limit_price, new_stop):
@@ -653,7 +691,7 @@ def alpaca():
                     log.info(f'Last Price for {inverse_ticker} was {inverse_limit_price}')
 
                     inverse_open_orders = checkOpenOrders(api, user, qty, inverse_side, inverse_ticker, inverse_position, inverse_mode)
-                    print(f'Open Orders is {inverse_open_orders}')
+                    log.info(f'Open Orders is {inverse_open_orders}')
                     try:
                         inverser_order_results = orderFlow(api, user, user_key, inverse_ticker, inverse_position, buying_power, int(inverse_position.qty), 'sell', order_type, time_in_force, inverse_limit_price, 'None', 'None')
                     except Exception as e:

@@ -1,10 +1,7 @@
 import requests
 import json
 import time
-from twelvedata import TDClient
 import asyncio
-import websocket
-import ssl
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
@@ -15,252 +12,368 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import config
-from apscheduler.schedulers.blocking import BlockingScheduler
 from dash.dependencies import Output, Input
+from sqlalchemy import create_engine
+import pymysql.cursors
+import logging
+from sys import stdout
+import mysql.connector as sql
+
+import pandas as pd
 
 now = datetime.now(timezone('UTC'))
 
-stock = 'btc-usd'  # input("Enter a Ticker: ")
+ticker = 'BTC/USD'
 initial_candle = True
 avd = -1
 count = None
 date_list = []
 tsl_list = []
+avn_list = []
 new_data = None
 first_run = True
+avn = None
+live_price = None
+data = None
+last_minute = None
+database = "trades"
+old_fig = {}
+tsl_array=[]
 
+log = logging.getLogger()
+log.setLevel(logging.DEBUG)
+log.propagate = False
+consoleHandler = logging.StreamHandler(stdout)
+log.addHandler(consoleHandler)
 
-def fetchLast5Candles(td):
-    global first_run
-    global df
+def checkTables(table,cursor):
+    stmt = "SHOW TABLES LIKE '%s' "% ('%'+str(table)+'%')
+    cursor.execute(stmt)
+    result = cursor.fetchone()          
+    return result
 
-    ts = td.time_series(
-        symbol="TQQQ",
-        outputsize=8,
-        interval="1h",
-    )
-    df = ts.as_pandas()
+def calcTsl(data):
+    live = data["close"].iloc[-1]
 
-    if first_run == True:
-        first_run = False
-        sched = BlockingScheduler()
-        sched.add_job(fetchLast5Candles, 'interval', args=[td], hours=1)
-        sched.start()
+    print(f"Last Price is {live}")
+    global avn
 
-def buildCandleDataFrame(live, data):
-    open_value = round(data['open'].iloc[-1], 2)
-    high_value = round(data['high'].iloc[-1], 2)
-    low_value = round(data['low'].iloc[-1], 2)
-    close_value = round(data['close'].iloc[-1], 2)
+    print(data)
+    now_utc = pytz.utc.localize(datetime.utcnow())
+    now_est = now_utc.astimezone(pytz.timezone("America/New_York"))
+    now_est = now_est.strftime('%Y-%m-%d %H:%M:%S.%f')#
+    high = data.high
+    #print(tsl_ts)
+    #print(high)#
+    last3H0 = high.tail(3)  # last 3 including active candle [0]
+    last3H1 = high.tail(4).head(3)  # last 3 not including active [1]
+    # print(last3H1)#
+    low = data.low
+    # print(low)#
+    low3H0 = low.tail(3)  # last 3 including active candle [0]
+    low3H1 = low.tail(4).head(3)  # last 3 not including active [1]
+    # print(low3H1)##
+    res0 = float(max(last3H0))  # MAX of prior including active [0]
+    res1 = float(max(last3H1))#
+    sup0 = float(min(low3H0))  # Min of prior including active [0]
+    sup1 = float(min(low3H1))
 
-    # Set the high value if it is greater than the open
-    if live > high_value:
-        print(f'Updating High Value from {high_value} to {live}')
-        high_value = live
+    print(f'Resistance 0 is {res0}')
+    print(f'Resistance 1 is {res1}')
+    print(f'Support 0 is {sup0}')
+    print(f'Support 1 is {sup1}')
 
-    # Set the low value if it is less than the open
-    if live < low_value:
-        print(f'Updating Low Value from {low_value} to {live}')
-        low_value = live
+    # AVD - Checks is live value is below or above prior candle
+    # support/resistance
+    if live > res1:
+        avd = 1
+    elif live < sup1:
+        avd = -1
+    else:
+        avd = 0
 
-    # After we have receieved any value, set close to current value
-    if live != close_value:
-        print(f'Updating Close Value from {close_value} to {live}')
-        close_value = live
+    # AVN  - AVD value of last non-zero condition stored.
+    if avd != 0:
+        avn = avd
 
-    todays_date = datetime.now()
-    index = pd.date_range(todays_date, periods=1, freq='D')
+    # TSL line
+    if avn == 1:
+        tsl = sup0
+    else:
+        tsl = res0
 
-    input = {'open':open_value, 'high':high_value,'low':low_value,'volume':0,'close':close_value}
+    print(f'AVD is {avd}')
+    print(f'AVN is {avn}')
+    print(f'TSL is {tsl}')
+    tsl_array.append(tsl)
+    print(tsl_array)
+    #print(f'Last Price is {live}')
 
-    new_candle = pd.DataFrame(input, index=index)
+    close_value = data.close.tail(1).iloc[0]
+    close = float(close_value)#
+    if live > tsl and live > close:
+        Buy = True  #Crossover of live price over tsl and higher than last candle close
+        print(f'Crossover Buy is True')
+    else:
+        Buy = False
+        print(f'Crossover Buy is False')
+    if live < tsl and live < close:
+        Sell = True #Crossunder of live price under tsl and lower than last candle close
+        print(f'Crossover Sell is True')
+    else:
+        Sell = False
+        print(f'Crossover Sell is False')
 
-    stamp = data.index.tolist()
-    index_stamp = stamp[len(stamp)-1]
+def fetchLastCandles(dbConnection):
+    try:
+        data = pd.read_sql_query(f"select * from `{ticker}`", dbConnection);
+    except Exception as e:
+        print(e)
+    
+    pd.set_option('display.expand_frame_repr', False)
+    print(f"Fetched Table: {data}")
+    return data
 
-    removed = data.drop(pd.Timestamp(index_stamp))
+app = dash.Dash(__name__,suppress_callback_exceptions=True)
 
-    new_data = removed.append(new_candle)
-    return new_data
+def serve_layout():
+    return html.Div(children=[
 
-app = dash.Dash(__name__)
-  
-app.layout = html.Div(children=[
-
-    dcc.Graph(id = 'candles', animate = True),
+    dcc.Graph(id = 'candles'),
+    html.Div([
+        html.Div([
+            dcc.Graph(id = 'tsl'),
+        ], className='six columns'),
+        html.Div([
+            dcc.Graph(id = 'avn'),
+        ], className='six columns')
+    ], className='row'),
     dcc.Interval(
-        id = 'update-candles',
-        interval = 5*1000,
+        id = 'interval-component',
+        interval = 10*1000,
         n_intervals = 0
         ),
-#    dcc.Graph(id = 'tsl', animate = True),
-#    dcc.Interval(
-#        id = 'update-tsl',
-#        interval = 5*1000,
-#        n_intervals = 0
-#        ),
-])
+    ])
+
+app.layout = serve_layout
   
 @app.callback(
     Output('candles', 'figure'),
-    [Input('update-candles', 'n_intervals')]
+    [Input('interval-component', 'n_intervals')]
 )
 def update_candles(n):
-    global count
-    global df
-    global initial_candle
-    global new_data
     global ticker
-    global td
-    global first_run
+    global old_fig
+    global database
+    global new_data
 
-    ticker = "TQQQ"
-    old_data = None
+    try:
+        sqlEngine = create_engine(f'mysql+pymysql://root:{config.DB_PASS}@127.0.0.1/{database}', pool_recycle=3600)
+    except Exception as e:
+        print(e)
+
+    connection = sqlEngine.raw_connection()
+    cursor = connection.cursor()
+    dbConnection = sqlEngine.connect()
 
     fig = go.Figure()
 
-    if first_run == True:
-        print('first run')
-        fetchLast5Candles(td)
+    new_data = fetchLastCandles(dbConnection)
+    dbConnection.close()
+    
+    if new_data is not None:
+        calcTsl(new_data)
 
-    price = requests.get(f"https://api.twelvedata.com/price?symbol={ticker}&apikey={config.API_KEY}").json()
-    live = round(float(price['price']), 2)
-    #print(f'Last Data is {live}')
+        candlesticks = go.Candlestick(x=new_data['datetime'],
+                               open=new_data['open'],
+                               high=new_data['high'],
+                               low=new_data['low'],
+                               close=new_data['close'], name='Market Data')
 
-    if initial_candle:
-        new_data = buildCandleDataFrame(live, df)
-        initial_candle = False
-        count = 0
+        fig.add_trace(candlesticks)
+
+        # Add Titles
+        fig.update_layout(
+            title=ticker + 'Live Price Data',
+            yaxis_title='Price (USD/share)'
+        )
+
+        # Axis and control
+        fig.update_xaxes(
+            rangeslider_visible=True,
+            rangeselector={'buttons': list((
+                dict(count=15, label="15m", step="minute", stepmode="backward"),
+                dict(count=30, label="30m", step="minute", stepmode="backward"),
+                dict(count=1, label="1h", step="hour", stepmode="backward"),
+                dict(count=2, label="2h", step="hour", stepmode="backward"),
+                dict(step="all")
+            ))})
+        old_fig = fig
+
+        return fig
     else:
-         new_data = buildCandleDataFrame(live, new_data)
+        return old_fig
 
+@app.callback(
+    Output('tsl', 'figure'),
+    [Input('interval-component', 'n_intervals')]
+)
+def update_tsl(n):
+    global new_data
+    global tsl_list
+    global date_list
 
-    candlesticks = update_candlesticks(new_data)
-    fig.add_trace(candlesticks)
+    table = f"{ticker}-live"
+    connection = pymysql.connect(host='localhost',
+                             user='root',
+                             password=config.DB_PASS,
+                             database=database,
+                             charset='utf8mb4',
+                             cursorclass=pymysql.cursors.DictCursor,
+                             autocommit=True)
 
-    # Add Titles
-    fig.update_layout(
-        title=stock + 'Live Price Data',
-        yaxis_title='Price (USD/share)'
-    )
+    connection.autocommit(True)
 
-    # Axis and control
-    fig.update_xaxes(
-        rangeslider_visible=True,
-        rangeselector={'buttons': list((
-            #  dict(count=15, label="15min", step="minute", stepmode="backward"),
-            # dict(count=45, label="45min", step="minute", stepmode="backward"),
-            dict(count=15, label="15m", step="minute", stepmode="backward"),
-            dict(count=30, label="30m", step="minute", stepmode="backward"),
-            dict(count=1, label="1h", step="hour", stepmode="backward"),
-            dict(count=2, label="2h", step="hour", stepmode="backward"),
-            dict(step="all")
+    with connection:
+        with connection.cursor() as cursor:
+            if checkTables(table, cursor):
+                sql = f"SELECT * FROM `{table}`"
+                cursor.execute(sql)
+                res = cursor.fetchone()
+                live_price = res['price']
+
+    fig = go.Figure()
+    print(f'Live Price is {live_price}')
+    print(f'TSL New Data is {new_data}')
+
+    if new_data is not None:
+        now_utc = pytz.utc.localize(datetime.utcnow())
+        now_est = now_utc.astimezone(pytz.timezone("America/New_York"))
+        now_est = now_est.strftime('%Y-%m-%d %H:%M:%S.%f')#
+        high = new_data.high
+        #print(high)#
+        last3H0 = high.tail(3)  # last 3 including active candle [0]
+        last3H1 = high.tail(4).head(3)  # last 3 not including active [1]
+        # print(last3H1)#
+        low = new_data.low
+        # print(low)#
+        low3H0 = low.tail(3)  # last 3 including active candle [0]
+        low3H1 = low.tail(4).head(3)  # last 3 not including active [1]
+        # print(low3H1)##
+        res0 = float(max(last3H0))  # MAX of prior including active [0]
+        res1 = float(max(last3H1))#
+        sup0 = float(min(low3H0))  # Min of prior including active [0]
+        sup1 = float(min(low3H1))
+
+        # print(f'Resistance 0 is {res0}')
+        # print(f'Resistance 1 is {res1}')
+        # print(f'Support 0 is {sup0}')
+        # print(f'Support 1 is {sup1}')#
+        # AVD - Checks is live value is below or above prior candle
+        # support/resistance
+        if live_price > res1:
+            avd = 1
+        elif live_price < sup1:
+            avd = -1
+        else:
+            avd = 0#
+        # AVN  - AVD value of last non-zero condition stored.
+        if avd != 0:
+            avn = avd
+            #prior_avd = avd
+        else:
+            #avn=prior_avd
+            avn = 0#
+        # TSL line
+        if avn == 1:
+            tsl = sup0
+        else:
+            tsl = res0
+        avn_list.append(avn)
+        print(f"AVN List is {avn_list}")
+        # print(f'AVD is {avd}')
+        # print(f'AVN is {avn}')
+        # print(f'TSL is {tsl}')
+        # print(f'Last Price is {live_price}') #
+        close_value = new_data.close.tail(1).iloc[0]
+        close = float(close_value)
+
+        if live_price > tsl and live_price > close:
+            Buy = True  #Crossover of live price over tsl and higher than last candle close
+        else:
+            Buy = False#
+        if live_price < tsl and live_price < close:
+            Sell = True #Crossunder of live price under tsl and lower than last candle close
+        else:
+            Sell = False#
+        #print(now_est)
+        date_list.append(now_est)
+        tsl_list.append(tsl)
+        tsl = go.Scatter(
+                x=date_list,
+                y=tsl_list,
+                mode='lines'
+            )
+
+        #print(f'TSL is {tsl}')
+        fig.add_trace(tsl)
+            # Add Titles
+        fig.update_layout(
+            title='TSL Crossover',
+            yaxis_title='TSL'
+        )#
+        # Axis and control
+        fig.update_xaxes(
+            rangeslider_visible=True,
+            rangeselector={'buttons': list((
+                dict(count=150, label="15m", step="minute", stepmode="backward"),
+                dict(count=300, label="30m", step="minute", stepmode="backward"),
+                dict(count=600, label="1h", step="hour", stepmode="backward"),
+                dict(count=1200, label="2h", step="hour", stepmode="backward"),
+                dict(step="all")
         ))})
-    count += 1
-    return fig
+        print(f'TSL Fig is {fig}')
+        return fig
+    else:
+        return {}
+    
+@app.callback(
+    Output('avn', 'figure'),
+    [Input('interval-component', 'n_intervals')]
+)
+def update_avn(n):
+    global avn_list
+    global date_list
 
-def update_candlesticks(data):
-    candlesticks = go.Candlestick(x=data.index,
-                               open=data['open'],
-                               high=data['high'],
-                               low=data['low'],
-                               close=data['close'], name='Market Data')
-    #print(candlesticks)
-    return candlesticks
+    if avn_list is not None and date_list is not None:
+        fig = go.Figure()
 
-#@app.callback(
-#    Output('tsl', 'figure'),
-#    [Input('update-tsl', 'n_intervals')]
-#)
-#def update_tsl(n):
-#    global tsl_ts
-#    fetchLast5Candles(tsl_ts)#
+        avn = go.Scatter(
+            x=date_list,
+            y=avn_list,
+            mode='lines'
+        )
 
-#    fig = go.Figure()
-#    now_utc = pytz.utc.localize(datetime.utcnow())
-#    now_est = now_utc.astimezone(pytz.timezone("America/New_York"))
-#    now_est = now_est.strftime('%Y-%m-%d %H:%M:%S.%f')#
-#    high = tsl_ts.high
-#    #print(high)#
-#    last3H0 = high.tail(3)  # last 3 including active candle [0]
-#    last3H1 = high.tail(4).head(3)  # last 3 not including active [1]
-#    # print(last3H1)#
-#    low = tsl_ts.low
-#    # print(low)#
-#    low3H0 = low.tail(3)  # last 3 including active candle [0]
-#    low3H1 = low.tail(4).head(3)  # last 3 not including active [1]
-#    # print(low3H1)##
+        fig.add_trace(avn)
 
-#    res0 = float(max(last3H0))  # MAX of prior including active [0]
-#    res1 = float(max(last3H1))#
-#    sup0 = float(min(low3H0))  # Min of prior including active [0]
-#    sup1 = float(min(low3H1))
-#    # print(f'Resistance 0 is {res0}')
-#    # print(f'Resistance 1 is {res1}')
-#    # print(f'Support 0 is {sup0}')
-#    # print(f'Support 1 is {sup1}')#
-#    # AVD - Checks is live value is below or above prior candle
-#    # support/resistance
-#    if live > res1:
-#        avd = 1
-#    elif live < sup1:
-#        avd = -1
-#    else:
-#        avd = 0#
-#    # AVN  - AVD value of last non-zero condition stored.
-#    if avd != 0:
-#        avn = avd
-#        #prior_avd = avd
-#    else:
-#        #avn=prior_avd
-#        avn = 0#
-#    # TSL line
-#    if avn == 1:
-#        tsl = sup0
-#    else:
-#        tsl = res0#
-#    # print(f'AVD is {avd}')
-#    # print(f'AVN is {avn}')
-#    # print(f'TSL is {tsl}')
-#    # print(f'Last Price is {live}') #
-#    close_value = new_data.close.tail(1).iloc[0]
-#    close = float(close_value)#
-#    if live > tsl and live > close:
-#        Buy = True  #Crossover of live price over tsl and higher than last candle close
-#    else:
-#        Buy = False#
-#    if live < tsl and live < close:
-#        Sell = True #Crossunder of live price under tsl and lower than last candle close
-#    else:
-#        Sell = False
-#    #print(now_est)
-#    date_list.append(now_est)
-#    tsl_list.append(tsl)
-#    tsl = go.Scatter(
-#            x=date_list,
-#            y=tsl_list,
-#            mode='lines'
-#        )
-#    print(f'TSL is {tsl}')
-#    fig.add_trace(tsl, tsl_list, date_list)#
-#        # Add Titles
-#    fig.update_layout(
-#        title='TSL Crossover',
-#        yaxis_title='TSL'
-#    )#
-#    # Axis and control
-#    fig.update_xaxes(
-#        rangeslider_visible=True,
-#        rangeselector={'buttons': list((
-#            dict(count=15, label="15m", step="minute", stepmode="backward"),
-#            dict(count=30, label="30m", step="minute", stepmode="backward"),
-#            dict(count=1, label="1h", step="hour", stepmode="backward"),
-#            dict(count=2, label="2h", step="hour", stepmode="backward"),
-#            dict(step="all")
-#    ))})
-#    return fig
+        fig.update_layout(
+            title='AVN',
+            yaxis_title='AVN'
+        )
+
+        fig.update_xaxes(
+            rangeslider_visible=True,
+            rangeselector={'buttons': list((
+                dict(count=15, label="15m", step="minute", stepmode="backward"),
+                dict(count=30, label="30m", step="minute", stepmode="backward"),
+                dict(count=1, label="1h", step="hour", stepmode="backward"),
+                dict(count=2, label="2h", step="hour", stepmode="backward"),
+                dict(step="all")
+        ))})
+        return fig
+    else:
+        return {}
 
 if __name__ == '__main__':
-    global td
-    td = TDClient(apikey=config.API_KEY)
     app.run_server(debug=True, port=8080, use_reloader=True)
+
