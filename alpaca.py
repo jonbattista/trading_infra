@@ -270,13 +270,13 @@ def submitAlpacaOrder(ticker, quantity, limit_price, side, APCA_API_KEY_ID, APCA
 				log.info(message)
 				sendDiscordMessage(message)
 				return message
-if __name__ == '__main__':
-	ticker = 'QQQ'
-	quantity = 1
-	price = 366.5
-	side = 'buy'
-	APCA_API_KEY_ID = 'PKR3AEEJD6M0W2F3VVLB'
-	APCA_API_SECRET_KEY = 'xWZ2tLr6R6OAZwESHJ5Un8M3Mkj3w8njUBwV8v68'
+#if __name__ == '__main__':
+#	ticker = 'QQQ'
+#	quantity = 1
+#	price = 366.5
+#	side = 'buy'
+#	APCA_API_KEY_ID = ''
+#	APCA_API_SECRET_KEY = ''
 
-	submitAlpacaOrder(ticker, quantity, price, side, APCA_API_KEY_ID, APCA_API_SECRET_KEY)
+#	submitAlpacaOrder(ticker, quantity, price, side, APCA_API_KEY_ID, APCA_API_SECRET_KEY)
 
